@@ -1,0 +1,1299 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<meta name="theme-color" content="#2D5016">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Gaia Colonie">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Gaia Animali & Ambiente – Colonie Basiglio</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --forest:#2D5016;--forest2:#3a6b1e;--leaf:#5a8f2a;--lime:#8BC34A;
+  --earth:#6D4C28;--sand:#F5E6C8;--cream:#FBF7F0;
+  --orange:#E07B39;--orange2:#c96820;
+  --red:#D32F2F;--yellow:#F9A825;--green:#388E3C;
+  --border:#dde8cc;--bg:#f2f5ed;--muted:#789060;
+  --lblue:#eaf4de;
+}
+html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:#222}
+button,input,select,textarea{font-family:inherit}
+/* HEADER */
+#hdr{position:fixed;top:0;left:0;right:0;height:52px;background:var(--forest);color:#fff;
+  display:flex;align-items:center;gap:10px;padding:0 14px;z-index:400;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+#hamburger{background:none;border:none;color:#fff;font-size:24px;cursor:pointer;padding:4px 8px;border-radius:6px;flex-shrink:0}
+#hamburger:hover{background:rgba(255,255,255,.15)}
+.hdr-info{flex:1;overflow:hidden}
+.hdr-title{font-size:14px;font-weight:700}
+.hdr-sub{font-size:9px;opacity:.65;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* DRAWER */
+#drawer-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500}
+#drawer-overlay.open{display:block}
+#sidebar{position:fixed;top:0;left:-270px;bottom:0;width:250px;background:#fff;z-index:600;
+  display:flex;flex-direction:column;box-shadow:4px 0 24px rgba(0,0,0,.2);
+  transition:left .25s cubic-bezier(.4,0,.2,1);overflow-y:auto}
+#sidebar.open{left:0}
+.sb-hdr{background:var(--forest);color:#fff;padding:16px 16px 14px;flex-shrink:0;position:relative}
+.sb-logo{font-size:11px;opacity:.7;margin-bottom:4px}
+.sb-name{font-size:15px;font-weight:700}.sb-role{font-size:11px;opacity:.7;margin-top:3px}
+.sb-close{position:absolute;top:12px;right:12px;background:rgba(255,255,255,.15);
+  border:none;color:#fff;border-radius:6px;padding:4px 10px;font-size:18px;cursor:pointer}
+.nav-item{display:flex;align-items:center;gap:12px;padding:12px 16px;border:none;
+  background:transparent;color:#444;font-size:14px;font-weight:500;cursor:pointer;
+  width:100%;text-align:left;border-left:3px solid transparent;transition:all .15s}
+.nav-item:hover{background:#f5f5f5}
+.nav-item.on{color:var(--forest);background:var(--lblue);border-left-color:var(--forest);font-weight:600}
+.nav-item .ni{font-size:20px;width:28px;text-align:center;flex-shrink:0}
+.nav-sep{height:1px;background:#f0f0f0;margin:4px 0}
+/* LAYOUT */
+#main{margin-top:52px;min-height:calc(100vh - 52px);overflow-y:auto;overflow-x:hidden}
+.page{max-width:740px;margin:0 auto;padding:14px 12px 40px}
+.card{background:#fff;border-radius:12px;border:1px solid var(--border);padding:14px;margin-bottom:12px}
+.lbl{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px}
+.inp{width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;outline:none;background:#f7f7f7;transition:border-color .2s}
+.inp:focus{border-color:var(--forest);background:#fff}
+.inp[readonly]{background:#f0f0f0}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.btn{border:none;border-radius:8px;padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:5px;justify-content:center}
+.btn-p{background:var(--forest);color:#fff;width:100%}
+.btn-g{background:#f0f0f0;color:#444}
+.btn-r{background:var(--red);color:#fff}
+.btn-o{background:var(--orange);color:#fff}
+.btn-gr{background:var(--green);color:#fff}
+.btn-sm{padding:5px 10px;font-size:12px;border-radius:6px;width:auto}
+.badge{font-weight:700;padding:3px 10px;border-radius:999px;font-size:13px;display:inline-block;text-align:center;min-width:32px}
+.b0{background:#f0f0f0;color:#999}.b1{background:var(--red);color:#fff}
+.b2{background:var(--yellow);color:#333}.b3{background:var(--green);color:#fff}
+.rbadge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px}
+.r-coordinatore{background:#E8F5E9;color:#2E7D32}.r-referente_colonia{background:#E3F2FD;color:#0D47A1}
+.r-volunteer{background:#F1F8E9;color:#33691E}
+.view-toggle{display:flex;border:1.5px solid #ddd;border-radius:8px;overflow:hidden;margin-bottom:12px}
+.vt{flex:1;padding:8px;font-size:13px;font-weight:500;border:none;background:#fff;color:var(--muted);cursor:pointer}
+.vt.on{background:var(--forest);color:#fff}
+.wg{display:grid;grid-template-columns:48px repeat(7,1fr);border:1px solid var(--border);border-radius:10px;overflow:hidden;background:#fff}
+.wg-hdr{background:var(--forest);color:#fff;padding:6px 2px;text-align:center;font-size:10px;font-weight:600}
+.wg-hdr.tod{background:var(--forest2)}
+.wg-lbl{background:#f7f7f7;border-right:1px solid var(--border);border-bottom:1px solid #f0f0f0;padding:5px 2px;font-size:9px;font-weight:600;color:var(--muted);display:flex;align-items:center;justify-content:center;text-align:center}
+.wg-cell{border-right:1px solid #f0f0f0;border-bottom:1px solid #f0f0f0;padding:4px 2px;cursor:pointer;min-height:42px;transition:background .15s}
+.wg-cell:hover{background:#f0f7e6}.wg-cell.mine{background:var(--lblue)}
+.wg-cell.scoperto{background:#FFF3E0;border:1px solid #FFB74D}
+.sess-block{border-radius:10px;overflow:hidden;border:1px solid var(--border);margin-bottom:8px}
+.sess-hdr{padding:10px 14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px}
+.sess-body{padding:10px 14px;background:#fff}
+.chip{font-size:12px;padding:4px 10px;border-radius:999px;background:#f0f0f0;color:#444;display:inline-block;margin:2px;font-weight:500}
+.chip.mine{background:var(--lblue);color:var(--forest);font-weight:700}
+.chip.indisp{background:#FFF3E0;color:#E65100;text-decoration:line-through;font-style:italic}
+/* COLONIE GRID */
+.colony-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:16px}
+.colony-card{border-radius:12px;border:2px solid var(--border);background:#fff;padding:12px;text-align:center;cursor:pointer;transition:all .15s}
+.colony-card:hover{border-color:var(--forest);box-shadow:0 3px 10px rgba(45,80,22,.15)}
+.colony-card.sel{border-color:var(--forest);background:var(--lblue)}
+.colony-icon{font-size:28px;margin-bottom:4px}
+.colony-name{font-size:14px;font-weight:700;color:var(--forest)}
+.colony-info{font-size:11px;color:var(--muted);margin-top:3px}
+/* GATTI */
+.cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px;margin-bottom:12px}
+.cat-card{border-radius:10px;border:2px solid #ddd;background:#fff;padding:9px;text-align:center;cursor:pointer;transition:all .15s}
+.cat-card:hover{border-color:var(--forest);box-shadow:0 2px 8px rgba(0,0,0,.1)}
+.cat-card.steril{border-color:var(--lime);background:#F1F8E9}
+.cat-icon{font-size:22px}
+.cat-name{font-size:12px;font-weight:700;margin-top:3px}
+.cat-info{font-size:10px;color:var(--muted);margin-top:2px;line-height:1.4}
+/* TABS */
+.tab-row{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.tab{padding:6px 14px;border-radius:999px;font-size:13px;font-weight:500;border:1.5px solid #ddd;background:#fff;color:var(--muted);cursor:pointer}
+.tab.on{background:var(--forest);border-color:var(--forest);color:#fff}
+/* TABLE */
+.tw{overflow-x:auto;border-radius:10px;border:1px solid var(--border)}
+.tbl{border-collapse:collapse;width:100%;font-size:12px;min-width:460px}
+.tbl th{padding:8px 10px;background:var(--forest);color:#fff;font-weight:600;white-space:nowrap}
+.tbl td{padding:7px 10px;border-bottom:1px solid #f0f0f0;text-align:center}
+.tbl td:first-child,.tbl td:nth-child(2){text-align:left;font-weight:600}
+.tbl tr:nth-child(even) td{background:#f9fbf5}
+/* SHEET */
+#sheet-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:700;align-items:flex-end;justify-content:center}
+#sheet-overlay.open{display:flex}
+#sheet{background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:700px;max-height:88vh;overflow-y:auto;padding:0 16px 28px}
+.sh-handle{width:36px;height:4px;border-radius:999px;background:#ddd;margin:12px auto 14px}
+.ck-group{display:flex;flex-wrap:wrap;gap:6px}
+.ck{display:flex;align-items:center;gap:5px;padding:5px 10px;border:1.5px solid #ddd;border-radius:8px;cursor:pointer;font-size:12px;font-weight:500;transition:all .15s;user-select:none}
+.ck.on{border-color:var(--forest);background:var(--lblue);color:var(--forest)}
+/* STATS */
+.stats{display:grid;gap:8px;margin-bottom:12px}
+.stat{background:#fff;border-radius:10px;border:1px solid var(--border);padding:12px;text-align:center}
+.stat-n{font-size:24px;font-weight:700;color:var(--forest)}.stat-l{font-size:11px;color:var(--muted);margin-top:2px}
+.sec-title{font-size:16px;font-weight:700;color:var(--forest);margin-bottom:10px}
+.empty{text-align:center;padding:2.5rem;color:var(--muted);font-size:14px}
+/* TOAST */
+#toast{position:fixed;top:62px;left:50%;transform:translateX(-50%);z-index:999;padding:10px 20px;
+  border-radius:8px;font-size:14px;font-weight:500;color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.2);
+  pointer-events:none;opacity:0;transition:opacity .25s;white-space:nowrap}
+/* LOGIN */
+#login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(145deg,#1a3a09,#2D5016,#3a6b1e);padding:20px}
+.login-box{background:#fff;border-radius:20px;padding:2rem 1.5rem;width:100%;max-width:360px;box-shadow:0 8px 32px rgba(0,0,0,.25)}
+/* ALERT BANNER */
+.alert-turni{background:linear-gradient(135deg,#FFF3E0,#FFE0B2);border:2px solid #FFB74D;border-radius:12px;padding:14px;margin-bottom:12px}
+.alert-indisp{background:linear-gradient(135deg,#E8F5E9,#C8E6C9);border:2px solid #81C784;border-radius:12px;padding:14px;margin-bottom:12px}
+.alert-title{font-size:14px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.alert-item{font-size:12px;padding:5px 0;border-bottom:1px solid rgba(0,0,0,.07);display:flex;justify-content:space-between;align-items:center;gap:6px}
+.alert-item:last-child{border-bottom:none}
+/* COLONIA BADGE */
+.colonia-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700;background:var(--lblue);color:var(--forest);border:1px solid var(--border)}
+</style>
+</head>
+<body>
+<script>
+// ══ FIREBASE CONFIG ══════════════════════════════════════════════════════════
+const FB={
+  apiKey:"AIzaSyB6QevuvhcK4rCv88s5GsHFZ4C_xiQpFuo",
+  authDomain:"gaia-ambiente.firebaseapp.com",
+  projectId:"gaia-ambiente",
+  storageBucket:"gaia-ambiente.firebasestorage.app",
+  messagingSenderId:"729100261222",
+  appId:"1:729100261222:web:a316e957456a718ba25aa7"
+};
+</script>
+<div id="app"></div>
+<div id="drawer-overlay"></div>
+<div id="sidebar"></div>
+<div id="sheet-overlay"><div id="sheet"></div></div>
+<div id="toast"></div>
+
+<script type="module">
+import{initializeApp}from'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import{getFirestore,collection,doc,addDoc,getDocs,updateDoc,deleteDoc,
+  query,where,serverTimestamp,onSnapshot}from'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+const fba=initializeApp(FB);const db=getFirestore(fba);
+
+// ── COSTANTI ──────────────────────────────────────────────────────────────────
+const MONTHS=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+const DOWS=['Lun','Mar','Mer','Gio','Ven','Sab','Dom'];
+const SOGLIA_ALERT_GIORNI=15; // avvisa turni scoperti entro 15 giorni
+
+const RUOLI={
+  coordinatore:{label:'Coordinatore',cls:'r-coordinatore'},
+  referente_colonia:{label:'Referente Colonia',cls:'r-referente_colonia'},
+  volunteer:{label:'Volontario',cls:'r-volunteer'}
+};
+
+// Colonie predefinite (estendibili dall'admin)
+const COLONIE_DEFAULT=[
+  {id:'solco',nome:'Solco',emoji:'🌿',colore:'#388E3C'},
+  {id:'ontani',nome:'Ontani',emoji:'🍂',colore:'#795548'},
+];
+
+// ── HELPERS DATE ──────────────────────────────────────────────────────────────
+const ymd=(y,m,d)=>`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+const today=()=>{const n=new Date();return ymd(n.getFullYear(),n.getMonth()+1,n.getDate());};
+const fromYMD=s=>{const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d);};
+const addDays=(s,n)=>{const d=fromYMD(s);d.setDate(d.getDate()+n);return toYMD(d);};
+const toYMD=d=>ymd(d.getFullYear(),d.getMonth()+1,d.getDate());
+const monOf=s=>{const d=fromYMD(s);const w=d.getDay();d.setDate(d.getDate()-(w===0?6:w-1));return toYMD(d);};
+const wkDays=m=>Array.from({length:7},(_,i)=>addDays(m,i));
+const fmtL=s=>fromYMD(s).toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'});
+const fmtS=s=>fromYMD(s).toLocaleDateString('it-IT',{day:'numeric',month:'short'});
+const monStart=(y,m)=>ymd(y,m+1,1);
+const monEnd=(y,m)=>ymd(y,m+1,new Date(y,m+1,0).getDate());
+const daysDiff=(a,b)=>Math.max(0,Math.round((new Date(b)-new Date(a))/86400000));
+const normCF=cf=>cf.trim().toUpperCase().replace(/\s/g,'');
+const bc=n=>n===0?'b0':n<2?'b1':n===2?'b2':'b3';
+const fmtTs=ts=>{if(!ts||!ts.seconds)return'';const d=new Date(ts.seconds*1000);
+  return d.toLocaleDateString('it-IT',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});};
+const getRuoli=u=>{if(!u)return['volunteer'];if(Array.isArray(u.ruoli)&&u.ruoli.length)return u.ruoli;
+  return['volunteer'];};
+const can=(u,...roles)=>{if(!u)return false;const ur=getRuoli(u);if(ur.includes('coordinatore'))return true;
+  if(roles.includes('volunteer'))return true;return roles.some(r=>ur.includes(r));};
+const rlLabel=u=>getRuoli(u).filter(r=>r!=='volunteer').map(r=>RUOLI[r]?.label||r).join(', ')||'Volontario';
+
+// ── STATO APPLICAZIONE ────────────────────────────────────────────────────────
+const S={
+  screen:'login',user:null,page:'bacheca',calView:'settimanale',
+  selDate:today(),selYear:new Date().getFullYear(),selMonth:new Date().getMonth(),
+  selWeekMon:monOf(today()),evTab:'banchetti',
+  // dati firebase
+  vols:[],shifts:[],eventi:[],partecipazioni:[],chest:[],comms:[],
+  colonie:[...COLONIE_DEFAULT], // colonie estese dall'admin
+  gatti:[],                     // {id, coloniaId, nome, sesso, colore, sterilizzato, note, dataIngresso}
+  indisponibilita:[],           // {id, volunteerId, date, coloniaId, motivo, createdAt}
+  // UI state
+  selColonia:'solco',           // colonia attiva nel calendario
+  loginCF:'',loginPin:'',loginErr:'',loginStep:1,loginRimanere:false,loading:false,
+  setPinMode:false,setPinNew:'',setPinConf:'',_tmpVol:null,_newComm:false,
+  setupNome:'',setupCognome:'',setupCF:'',
+  fv:{nome:'',cognome:'',cf:'',ruoli:['volunteer'],coloniaIds:[]},
+  fcom:{titolo:'',testo:'',importante:false},
+  fev:{titolo:'',data:today(),oraI:'09:00',oraF:'13:00',luogo:'',note:''},
+  fch:{negozio:'',indirizzo:'',note:''},
+  fcat:{nome:'',sesso:'F',colore:'',sterilizzato:true,note:'',dataIngresso:today(),coloniaId:''},
+  findisp:{date:today(),coloniaId:'solco',motivo:''},
+  addCom:false,addEv:false,addCh:false,addCat:false,addColonia:false,addIndisp:false,
+  fNewColonia:{nome:'',emoji:'🐱'},
+  coloniaTab:'gatti',   // tab dentro pagina colonie
+  catDetail:null,       // gatto selezionato per dettaglio
+  volDetail:null,       // volontario selezionato
+  volColoniaFilter:'tutte',
+};
+
+// ── REALTIME ──────────────────────────────────────────────────────────────────
+let _uns=[];
+const clearListeners=()=>{_uns.forEach(u=>u());_uns=[];};
+const setupRealtime=()=>{
+  clearListeners();
+  const watch=(col,arr,pages,sort)=>{
+    let primo=true;
+    _uns.push(onSnapshot(collection(db,col),snap=>{
+      if(primo){primo=false;return;}
+      let changed=false;
+      snap.docChanges().forEach(ch=>{
+        const d={id:ch.doc.id,...ch.doc.data()};
+        if(ch.type==='added'&&!S[arr].find(x=>x.id===d.id)){S[arr].push(d);changed=true;}
+        if(ch.type==='modified'){const i=S[arr].findIndex(x=>x.id===d.id);if(i>=0){S[arr][i]=d;changed=true;}}
+        if(ch.type==='removed'){S[arr]=S[arr].filter(x=>x.id!==ch.doc.id);changed=true;}
+      });
+      if(changed){if(sort)sort();if(S.screen==='app'&&pages.includes(S.page))render();}
+    }));
+  };
+  watch('turni','shifts',['calendario','io']);
+  watch('partecipazioni','partecipazioni',['eventi','io']);
+  watch('gatti','gatti',['colonie']);
+  watch('indisponibilita','indisponibilita',['calendario','io']);
+  {let primo=true;
+  _uns.push(onSnapshot(collection(db,'comunicazioni'),snap=>{
+    if(primo){primo=false;return;}
+    let changed=false;
+    snap.docChanges().forEach(ch=>{
+      const c={id:ch.doc.id,...ch.doc.data()};
+      if(ch.type==='added'&&!S.comms.find(x=>x.id===c.id)){
+        S.comms.unshift(c);sortComms();changed=true;
+        if(S.user){const ls=+(localStorage.getItem('lsc_'+S.user.id)||0);
+          if((c.createdAt?.seconds||0)>ls)S._newComm=true;}
+      }
+      if(ch.type==='removed'){S.comms=S.comms.filter(x=>x.id!==ch.doc.id);changed=true;}
+    });
+    if(changed&&S.screen==='app')render();
+  }));}
+};
+
+// ── FIREBASE CARICAMENTO ──────────────────────────────────────────────────────
+const colLoad=async(c,arr)=>{const s=await getDocs(collection(db,c));S[arr]=s.docs.map(d=>({id:d.id,...d.data()}));};
+const loadShifts=async(from,to)=>{
+  const q=query(collection(db,'turni'),where('date','>=',from),where('date','<=',to));
+  const s=await getDocs(q);S.shifts=S.shifts.filter(sh=>sh.date<from||sh.date>to);
+  S.shifts.push(...s.docs.map(d=>({id:d.id,...d.data()})));};
+const loadCurMon=async()=>{const f=monStart(S.selYear,S.selMonth),t=monEnd(S.selYear,S.selMonth);await loadShifts(f,t);};
+const loadYear=async()=>loadShifts(`${S.selYear}-01-01`,`${S.selYear}-12-31`);
+const sortComms=()=>S.comms.sort((a,b)=>{if(a.importante&&!b.importante)return -1;if(!a.importante&&b.importante)return 1;return(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0);});
+
+const loadAll=async()=>{
+  await Promise.all([
+    colLoad('volunteers','vols'),loadCurMon(),
+    colLoad('eventi','eventi'),colLoad('chest','chest'),
+    colLoad('partecipazioni','partecipazioni'),
+    colLoad('comunicazioni','comms'),
+    colLoad('gatti','gatti'),
+    colLoad('indisponibilita','indisponibilita'),
+    loadYear()
+  ]);
+  // carica colonie custom da Firebase (merge con default)
+  try{
+    const snap=await getDocs(collection(db,'colonie'));
+    const dbCols=snap.docs.map(d=>({id:d.id,...d.data()}));
+    // unisci: default non override da DB, custom solo da DB
+    const defaultIds=COLONIE_DEFAULT.map(c=>c.id);
+    const extra=dbCols.filter(c=>!defaultIds.includes(c.id));
+    S.colonie=[...COLONIE_DEFAULT,...extra];
+  }catch(e){}
+  S.vols.sort((a,b)=>a.cognome.localeCompare(b.cognome));
+  sortComms();
+};
+
+const findByCF=async cf=>{const q=query(collection(db,'volunteers'),where('codiceFiscale','==',cf));
+  const s=await getDocs(q);return s.empty?null:{id:s.docs[0].id,...s.docs[0].data()};};
+const afterLogin=async vol=>{
+  window._db=db;window._currentUserId=vol.id;
+  S.user=vol;await loadAll();
+  const ls=+(localStorage.getItem('lsc_'+vol.id)||0);
+  const newest=S.comms.length?Math.max(...S.comms.map(c=>c.createdAt?.seconds||0)):0;
+  S._newComm=newest>ls&&S.comms.length>0;
+  localStorage.setItem('lsc_'+vol.id,String(newest));
+  setupRealtime();S.screen='app';S.page='bacheca';};
+
+// ── AUTH ──────────────────────────────────────────────────────────────────────
+const doLogin=async()=>{
+  if(S.loginStep===1){
+    const cf=normCF(S.loginCF);
+    if(!cf){S.loginErr='Inserisci il codice fiscale';render();return;}
+    S.loading=true;render();
+    try{
+      const all=await getDocs(collection(db,'volunteers'));
+      if(all.empty){S.screen='setup';S.setupCF=cf;S.loading=false;render();return;}
+      const vol=await findByCF(cf);
+      if(!vol){S.loginErr='Codice fiscale non trovato.';S.loading=false;render();return;}
+      if(!vol.approved){S.loginErr='Accesso non abilitato.';S.loading=false;render();return;}
+      if(!vol.pin){S._tmpVol=vol;S.setPinMode=true;S.loading=false;render();return;}
+      S.loginStep=2;S._tmpVol=vol;S.loginErr='';
+    }catch(e){S.loginErr='Errore di connessione.';}
+    S.loading=false;render();
+  }else{
+    if(!S.loginPin||S.loginPin.length<4){S.loginErr='PIN minimo 4 cifre';render();return;}
+    if(S.loginPin!==S._tmpVol.pin){S.loginErr='PIN non corretto.';render();return;}
+    S.loading=true;render();
+    try{
+      await afterLogin(S._tmpVol);
+      if(S.loginRimanere)localStorage.setItem('savedUser',S._tmpVol.id);
+      S.loginStep=1;S.loginCF='';S.loginPin='';S._tmpVol=null;
+    }catch(e){S.loginErr='Errore.';}
+    S.loading=false;render();}};
+const doSetPin=async()=>{
+  if(S.setPinNew.length<4){toast('PIN minimo 4 cifre','err');return;}
+  if(S.setPinNew!==S.setPinConf){toast('I PIN non coincidono','err');return;}
+  await updateDoc(doc(db,'volunteers',S._tmpVol.id),{pin:S.setPinNew});
+  S._tmpVol.pin=S.setPinNew;
+  await afterLogin(S._tmpVol);
+  if(S.loginRimanere)localStorage.setItem('savedUser',S._tmpVol.id);
+  S.setPinMode=false;S.setPinNew='';S.setPinConf='';S._tmpVol=null;render();};
+const doSetupAdmin=async()=>{
+  const nome=S.setupNome.trim(),cog=S.setupCognome.trim();
+  if(!nome||!cog){toast('Inserisci nome e cognome','err');return;}
+  const v={nome,cognome:cog,codiceFiscale:S.setupCF,approved:true,ruoli:['coordinatore','volunteer'],
+    coloniaIds:[],pin:null,createdAt:serverTimestamp()};
+  const ref=await addDoc(collection(db,'volunteers'),v);
+  S._tmpVol={id:ref.id,...v};S.setPinMode=true;render();};
+const doLogout=()=>{
+  localStorage.removeItem('savedUser');clearListeners();
+  Object.assign(S,{user:null,screen:'login',loginCF:'',loginPin:'',loginErr:'',loginStep:1,loginRimanere:false,
+    page:'bacheca',setPinMode:false,_tmpVol:null,shifts:[],vols:[],eventi:[],partecipazioni:[],chest:[],
+    comms:[],gatti:[],indisponibilita:[]});render();};
+
+// ── TURNI ─────────────────────────────────────────────────────────────────────
+const doAddShift=async(date,coloniaId,volId)=>{
+  const vid=volId||S.user.id;
+  const v=S.vols.find(x=>x.id===vid)||S.user;
+  if(S.shifts.find(s=>s.date===date&&s.coloniaId===coloniaId&&s.volunteerId===vid)){toast('Già presente in questo turno','warn');return;}
+  const colonia=S.colonie.find(c=>c.id===coloniaId);
+  const sh={date,coloniaId,coloniaNome:colonia?.nome||coloniaId,
+    volunteerId:vid,volunteerNome:v.nome,volunteerCognome:v.cognome,createdAt:serverTimestamp()};
+  await addDoc(collection(db,'turni'),sh);
+  toast('Aggiunto al turno');};
+const doRemShift=async id=>{await deleteDoc(doc(db,'turni',id));toast('Rimosso','warn');render();};
+
+// ── INDISPONIBILITA ───────────────────────────────────────────────────────────
+const doAddIndisp=async()=>{
+  const f=S.findisp;
+  if(!f.date||!f.coloniaId){toast('Data e colonia obbligatorie','err');return;}
+  if(f.date<today()){toast('Non puoi segnalare indisponibilità nel passato','err');return;}
+  const exists=S.indisponibilita.find(i=>i.volunteerId===S.user.id&&i.date===f.date&&i.coloniaId===f.coloniaId);
+  if(exists){toast('Indisponibilità già segnalata per questa data e colonia','warn');return;}
+  const rec={date:f.date,coloniaId:f.coloniaId,motivo:f.motivo.trim(),
+    volunteerId:S.user.id,volunteerNome:S.user.nome,volunteerCognome:S.user.cognome,
+    createdAt:serverTimestamp()};
+  await addDoc(collection(db,'indisponibilita'),rec);
+  // Notifica push al coordinatore
+  sendPushNotification(
+    `⚠️ Indisponibilità segnalata`,
+    `${S.user.cognome} ${S.user.nome} non può fare il turno del ${fmtS(f.date)} a ${S.colonie.find(c=>c.id===f.coloniaId)?.nome||f.coloniaId}`,
+    'indisponibilita'
+  );
+  S.findisp={date:today(),coloniaId:S.selColonia,motivo:''};
+  S.addIndisp=false;toast('Indisponibilità segnalata');render();};
+const doRemIndisp=async id=>{await deleteDoc(doc(db,'indisponibilita',id));toast('Rimossa','warn');render();};
+
+// ── VOLONTARI ─────────────────────────────────────────────────────────────────
+const doAddVol=async()=>{
+  const{nome,cognome,cf:cfR,ruoli,coloniaIds}=S.fv;const cf=normCF(cfR);
+  if(!nome.trim()||!cognome.trim()){toast('Nome e cognome obbligatori','err');return;}
+  if(cf.length!==16){toast('CF deve avere 16 caratteri','err');return;}
+  if(await findByCF(cf)){toast('CF già presente','err');return;}
+  const fr=[...new Set([...(ruoli||[]),'volunteer'])];
+  const v={nome:nome.trim(),cognome:cognome.trim(),codiceFiscale:cf,approved:true,
+    ruoli:fr,coloniaIds:coloniaIds||[],pin:null,createdAt:serverTimestamp()};
+  const ref=await addDoc(collection(db,'volunteers'),v);
+  S.vols.push({id:ref.id,...v});S.vols.sort((a,b)=>a.cognome.localeCompare(b.cognome));
+  S.fv={nome:'',cognome:'',cf:'',ruoli:['volunteer'],coloniaIds:[]};toast('Volontario aggiunto');render();};
+const doToggleApproved=async id=>{const v=S.vols.find(x=>x.id===id);if(!v)return;
+  await updateDoc(doc(db,'volunteers',id),{approved:!v.approved});v.approved=!v.approved;
+  toast(v.approved?'Abilitato':'Bloccato');render();};
+const doUpdateRuoli=async(id,nuovi)=>{const fr=[...new Set([...nuovi,'volunteer'])];
+  await updateDoc(doc(db,'volunteers',id),{ruoli:fr});const v=S.vols.find(x=>x.id===id);if(v)v.ruoli=fr;
+  toast('Ruoli aggiornati');render();};
+const doUpdateColonie=async(id,coloniaIds)=>{
+  await updateDoc(doc(db,'volunteers',id),{coloniaIds});
+  const v=S.vols.find(x=>x.id===id);if(v)v.coloniaIds=coloniaIds;
+  toast('Colonie aggiornate');render();};
+const doResetPin=async id=>{await updateDoc(doc(db,'volunteers',id),{pin:null});
+  const v=S.vols.find(x=>x.id===id);if(v)v.pin=null;toast('PIN resettato');render();};
+const doRemVol=async id=>{await deleteDoc(doc(db,'volunteers',id));S.vols=S.vols.filter(v=>v.id!==id);render();};
+
+// ── GATTI ─────────────────────────────────────────────────────────────────────
+const doAddGatto=async()=>{
+  const f=S.fcat;
+  if(!f.nome.trim()||!f.coloniaId){toast('Nome e colonia obbligatori','err');return;}
+  const g={nome:f.nome.trim(),sesso:f.sesso,colore:f.colore.trim(),
+    sterilizzato:f.sterilizzato,note:f.note.trim(),
+    dataIngresso:f.dataIngresso||today(),coloniaId:f.coloniaId,
+    createdById:S.user.id,createdAt:serverTimestamp()};
+  await addDoc(collection(db,'gatti'),g);
+  S.fcat={nome:'',sesso:'F',colore:'',sterilizzato:true,note:'',dataIngresso:today(),coloniaId:S.selColonia};
+  S.addCat=false;toast('Gatto aggiunto');render();};
+const doUpdateGatto=async(id,campi)=>{await updateDoc(doc(db,'gatti',id),campi);toast('Aggiornato');render();};
+const doRemGatto=async id=>{if(!confirm('Eliminare?'))return;await deleteDoc(doc(db,'gatti',id));toast('Rimosso','warn');closeSheet();render();};
+
+// ── COMUNICAZIONI ─────────────────────────────────────────────────────────────
+const doAddComm=async()=>{const f=S.fcom;if(!f.titolo.trim()||!f.testo.trim()){toast('Titolo e testo obbligatori','err');return;}
+  const c={titolo:f.titolo.trim(),testo:f.testo.trim(),importante:f.importante,
+    createdById:S.user.id,createdByNome:`${S.user.cognome} ${S.user.nome}`,createdAt:serverTimestamp()};
+  await addDoc(collection(db,'comunicazioni'),c);
+  S.fcom={titolo:'',testo:'',importante:false};S.addCom=false;toast('Pubblicata');
+  const emoji=c.importante?'🔴':'📢';
+  sendPushNotification(`${emoji} ${c.titolo}`,c.testo.substring(0,100),'bacheca');render();};
+const doToggleImp=async id=>{const c=S.comms.find(x=>x.id===id);if(!c)return;
+  await updateDoc(doc(db,'comunicazioni',id),{importante:!c.importante});c.importante=!c.importante;sortComms();render();};
+const doRemComm=async id=>{await deleteDoc(doc(db,'comunicazioni',id));render();};
+
+// ── EVENTI ────────────────────────────────────────────────────────────────────
+const doAddEv=async()=>{const f=S.fev;if(!f.titolo.trim()||!f.data||!f.luogo.trim()){toast('Titolo, data e luogo obbligatori','err');return;}
+  const ev={titolo:f.titolo.trim(),data:f.data,oraInizio:f.oraI,oraFine:f.oraF,luogo:f.luogo.trim(),note:f.note.trim(),createdAt:serverTimestamp()};
+  const ref=await addDoc(collection(db,'eventi'),ev);S.eventi.push({id:ref.id,...ev});S.eventi.sort((a,b)=>a.data.localeCompare(b.data));
+  S.fev={titolo:'',data:today(),oraI:'09:00',oraF:'13:00',luogo:'',note:''};S.addEv=false;toast('Evento aggiunto');render();};
+const doRemEv=async id=>{await deleteDoc(doc(db,'eventi',id));S.eventi=S.eventi.filter(e=>e.id!==id);render();};
+const doJoin=async(evId,dalle,alle)=>{
+  const fascia=dalle&&alle?`${dalle}–${alle}`:'';
+  const p={eventoId:evId,volunteerId:S.user.id,volunteerNome:S.user.nome,volunteerCognome:S.user.cognome,
+    fasciaOraria:fascia,dalle,alle,createdAt:serverTimestamp()};
+  await addDoc(collection(db,'partecipazioni'),p);toast('Iscritto');};
+const doLeave=async id=>{await deleteDoc(doc(db,'partecipazioni',id));render();};
+
+// ── CESTE ─────────────────────────────────────────────────────────────────────
+const doAddCh=async()=>{const f=S.fch;if(!f.negozio.trim()||!f.indirizzo.trim()){toast('Negozio e indirizzo obbligatori','err');return;}
+  const ch={negozio:f.negozio.trim(),indirizzo:f.indirizzo.trim(),note:f.note.trim(),responsabileId:'',responsabileNome:'',createdAt:serverTimestamp()};
+  const ref=await addDoc(collection(db,'chest'),ch);S.chest.push({id:ref.id,...ch});
+  S.fch={negozio:'',indirizzo:'',note:''};S.addCh=false;toast('Aggiunta');render();};
+const doRemCh=async id=>{await deleteDoc(doc(db,'chest',id));S.chest=S.chest.filter(c=>c.id!==id);render();};
+const doAssignCh=async(chId,volId)=>{const v=S.vols.find(x=>x.id===volId);const ch=S.chest.find(x=>x.id===chId);if(!ch)return;
+  await updateDoc(doc(db,'chest',chId),{responsabileId:volId,responsabileNome:v?`${v.cognome} ${v.nome}`:''});
+  ch.responsabileId=volId;ch.responsabileNome=v?`${v.cognome} ${v.nome}`:'';toast('Assegnato');render();};
+
+// ── COLONIE (admin) ───────────────────────────────────────────────────────────
+const doAddColonia=async()=>{
+  const nome=S.fNewColonia.nome.trim(),emoji=S.fNewColonia.emoji||'🐱';
+  if(!nome){toast('Nome colonia obbligatorio','err');return;}
+  const id=nome.toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
+  if(S.colonie.find(c=>c.id===id)){toast('Colonia già esistente','err');return;}
+  const col={id,nome,emoji,createdAt:serverTimestamp()};
+  await addDoc(collection(db,'colonie'),{...col});
+  S.colonie.push(col);S.fNewColonia={nome:'',emoji:'🐱'};S.addColonia=false;toast('Colonia aggiunta');render();};
+
+// ── ALERT TURNI SCOPERTI ──────────────────────────────────────────────────────
+const getTurniScoperti=()=>{
+  const results=[];
+  const tod=today();
+  const limite=addDays(tod,SOGLIA_ALERT_GIORNI);
+  // per ogni giorno da oggi+1 a oggi+15, per ogni colonia, verifica se ci sono turni
+  let d=addDays(tod,1);
+  while(d<=limite){
+    for(const col of S.colonie){
+      const ha=S.shifts.find(s=>s.date===d&&s.coloniaId===col.id);
+      if(!ha){results.push({date:d,coloniaId:col.id,coloniaNome:col.nome,emoji:col.emoji});}
+    }
+    d=addDays(d,1);
+  }
+  return results;};
+
+// ── CHECK INDISPONIBILITA SUI TURNI ──────────────────────────────────────────
+const getConflittiIndisp=()=>{
+  // turni assegnati a un volontario che si è segnato indisponibile
+  const results=[];
+  for(const sh of S.shifts){
+    if(sh.date<today())continue;
+    const indisp=S.indisponibilita.find(i=>i.volunteerId===sh.volunteerId&&i.date===sh.date&&i.coloniaId===sh.coloniaId);
+    if(indisp)results.push({shift:sh,indisp});
+  }
+  return results;};
+
+// ── NOTIFICHE PUSH ────────────────────────────────────────────────────────────
+const sendPushNotification=async(title,message,tag)=>{
+  try{
+    const snap=await getDocs(collection(db,'push_subscriptions'));
+    if(snap.empty)return;
+    const subscriptions=snap.docs.map(d=>d.data());
+    const res=await fetch('/.netlify/functions/send-push',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({subscriptions,title,message,tag})
+    });
+    if(res.ok){const data=await res.json();
+      if(data.expired?.length){const batch=snap.docs.filter(d=>data.expired.includes(d.data().endpoint));
+        await Promise.all(batch.map(d=>deleteDoc(doc(db,'push_subscriptions',d.id))));}
+      console.log('[PUSH] Inviate:',data.ok,'ok,',data.fail,'fallite');
+    }
+  }catch(e){console.warn('[PUSH] Errore:',e);}};
+
+// ── EXCEL PRESENZE ────────────────────────────────────────────────────────────
+const doExcel=()=>{
+  const wb=XLSX.utils.book_new();
+  const hS={fill:{patternType:'solid',fgColor:{rgb:'FF2D5016'}},font:{bold:true,color:{rgb:'FFFFFFFF'}},alignment:{horizontal:'center'}};
+  const cS=n=>{const rgb=n===0?null:n<2?'FFFF5252':n===2?'FFFFC107':'FF4CAF50';return{fill:rgb?{patternType:'solid',fgColor:{rgb}}:{},alignment:{horizontal:'center'}};};
+  for(const col of S.colonie){
+    const hdr=['Cognome','Nome','Ruoli',...MONTHS,'Totale'];
+    const rows=[hdr,...S.vols.map(v=>{
+      const r=rlLabel(v);
+      const counts=MONTHS.map((_,mi)=>S.shifts.filter(s=>s.volunteerId===v.id&&s.coloniaId===col.id&&s.date.startsWith(`${S.selYear}-${String(mi+1).padStart(2,'0')}`)).length);
+      return[v.cognome,v.nome,r,...counts,counts.reduce((a,b)=>a+b,0)];
+    }).sort((a,b)=>b[b.length-1]-a[b.length-1])];
+    const ws=XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols']=[{wch:20},{wch:15},{wch:18},...MONTHS.map(()=>({wch:6})),{wch:7}];
+    for(let c=0;c<hdr.length;c++){const r=XLSX.utils.encode_cell({r:0,c});if(ws[r])ws[r].s=hS;}
+    for(let r=1;r<rows.length;r++)for(let c=3;c<rows[r].length;c++){const ref=XLSX.utils.encode_cell({r,c});if(ws[ref])ws[ref].s=cS(rows[r][c]);}
+    XLSX.utils.book_append_sheet(wb,ws,col.nome.substring(0,31));
+  }
+  XLSX.writeFile(wb,`presenze_gaia_${S.selYear}.xlsx`,{cellStyles:true});toast('Excel scaricato');};
+
+// ── UI HELPERS ────────────────────────────────────────────────────────────────
+let _toastT;
+const toast=(msg,type='ok')=>{const el=document.getElementById('toast');if(!el)return;
+  el.textContent=msg;el.style.background=type==='ok'?'#388E3C':type==='warn'?'#E65100':'#C62828';
+  el.style.opacity='1';clearTimeout(_toastT);_toastT=setTimeout(()=>{el.style.opacity='0';},2800);};
+const openSheet=(html,bindFn)=>{document.getElementById('sheet').innerHTML='<div class="sh-handle"></div>'+html;
+  document.getElementById('sheet-overlay').classList.add('open');if(bindFn)bindFn();};
+const closeSheet=()=>document.getElementById('sheet-overlay').classList.remove('open');
+const openDrawer=()=>{document.getElementById('sidebar').classList.add('open');document.getElementById('drawer-overlay').classList.add('open');};
+const closeDrawer=()=>{document.getElementById('sidebar').classList.remove('open');document.getElementById('drawer-overlay').classList.remove('open');};
+
+// ── SIDEBAR ───────────────────────────────────────────────────────────────────
+const buildSidebar=()=>{
+  const sb=document.getElementById('sidebar');
+  if(!S.user){sb.innerHTML='';return;}
+  const u=S.user;
+  const turniScop=getTurniScoperti().length;
+  const nav=[
+    {p:'bacheca',i:'📢',l:'Bacheca',ok:true},
+    {p:'calendario',i:'📅',l:'Calendario',ok:true},
+    {p:'io',i:'👤',l:'I miei turni',ok:!can(u,'coordinatore')},
+    {p:'colonie',i:'🐱',l:'Colonie',ok:true},
+    {p:'volontari',i:'👥',l:'Volontari',ok:can(u,'coordinatore','referente_colonia')},
+    {p:'eventi',i:'🎪',l:'Eventi',ok:true},
+    {p:'ceste',i:'🛒',l:'Ceste',ok:true},
+    {p:'presenze',i:'📊',l:'Presenze',ok:true},
+    {p:'admin',i:'⚙️',l:'Gestione',ok:can(u,'coordinatore')},
+  ].filter(n=>n.ok);
+  const rl=rlLabel(u);
+  const items=nav.map(n=>`<button class="nav-item${S.page===n.p?' on':''}" data-p="${n.p}">
+    <span class="ni">${n.i}</span>
+    <span style="flex:1">${n.l}</span>
+    ${n.p==='calendario'&&turniScop>0?`<span style="background:#FF5722;color:#fff;font-size:10px;font-weight:700;border-radius:999px;padding:1px 7px">${turniScop}</span>`:''}
+    </button>`).join('');
+  sb.innerHTML=`<div class="sb-hdr">
+    <button class="sb-close" id="sbClose">✕</button>
+    <div class="sb-logo">🐾 Gaia Animali & Ambiente</div>
+    <div class="sb-name">${u.cognome} ${u.nome}</div>
+    <div class="sb-role">${rl}</div>
+  </div>
+  <div class="nav-sep"></div>${items}
+  <div style="flex:1"></div><div class="nav-sep"></div>
+  <button class="nav-item" id="logoutBtn" style="color:var(--red)"><span class="ni">🚪</span><span>Esci</span></button>
+  ${window._canInstall?`<button class="nav-item" id="installBtn" style="color:var(--forest)"><span class="ni">📲</span><span>Installa app</span></button>`:''}
+  ${('Notification' in window)&&Notification.permission!=='granted'?`<button class="nav-item" id="notifBtn" style="color:var(--orange)"><span class="ni">🔔</span><span>Attiva notifiche</span></button>`:''}`;
+  document.getElementById('sbClose').addEventListener('click',closeDrawer);
+  document.getElementById('logoutBtn').addEventListener('click',doLogout);
+  document.getElementById('installBtn')?.addEventListener('click',async()=>{await window.installApp?.();closeDrawer();});
+  document.getElementById('notifBtn')?.addEventListener('click',async()=>{
+    const ok=await window.richiestaNotifiche?.();
+    if(ok)toast('✓ Notifiche attivate!');else toast('Notifiche non autorizzate','warn');
+    closeDrawer();render();buildSidebar();});
+  document.querySelectorAll('.nav-item[data-p]').forEach(b=>b.addEventListener('click',async e=>{
+    const p=e.currentTarget.dataset.p;S.page=p;closeDrawer();
+    if(p==='presenze')await loadYear();
+    render();buildSidebar();}));};
+
+// ── RENDER PRINCIPALE ─────────────────────────────────────────────────────────
+const render=()=>{
+  const app=document.getElementById('app');
+  if(S.screen==='login'){app.innerHTML=loginHTML();bindLogin();return;}
+  if(S.screen==='setup'){app.innerHTML=setupHTML();bindSetup();return;}
+  const rl=rlLabel(S.user);
+  app.innerHTML=`<div id="hdr"><button id="hamburger">☰</button>
+    <div class="hdr-info">
+      <div class="hdr-title">🐾 Gaia · Colonie Basiglio</div>
+      <div class="hdr-sub">${S.user.cognome} ${S.user.nome} · ${rl}</div>
+    </div>
+  </div><div id="main"><div class="page">${pageHTML()}</div></div>`;
+  document.getElementById('hamburger').addEventListener('click',()=>{openDrawer();buildSidebar();});
+  buildSidebar();bindPage();};
+
+const pageHTML=()=>{
+  if(S.page==='bacheca')return bachecaHTML();
+  if(S.page==='calendario')return calHTML();
+  if(S.page==='io')return ioHTML();
+  if(S.page==='colonie')return colonieHTML();
+  if(S.page==='volontari')return volontariHTML();
+  if(S.page==='eventi')return eventiHTML();
+  if(S.page==='ceste')return cesteHTML();
+  if(S.page==='presenze')return presenzeHTML();
+  if(S.page==='admin')return adminHTML();
+  return '';};
+
+// ── LOGIN HTML ────────────────────────────────────────────────────────────────
+const loginHTML=()=>{
+  if(S.setPinMode){return `<div id="login-wrap"><div class="login-box">
+<div style="font-size:40px;text-align:center;margin-bottom:.5rem">🔐</div>
+<div style="font-size:20px;font-weight:700;color:var(--forest);text-align:center;margin-bottom:.3rem">Crea il tuo PIN</div>
+<div style="font-size:13px;color:var(--muted);text-align:center;margin-bottom:1.2rem">Benvenuto/a <strong>${S._tmpVol?.nome}</strong>!</div>
+<div style="margin-bottom:10px"><div class="lbl">PIN (min. 4 cifre)</div>
+<input id="pinNew" class="inp" type="password" inputmode="numeric" maxlength="8" value="${S.setPinNew}" placeholder="Es. 1234" style="font-size:22px;letter-spacing:6px;text-align:center"></div>
+<div style="margin-bottom:14px"><div class="lbl">Conferma PIN</div>
+<input id="pinConf" class="inp" type="password" inputmode="numeric" maxlength="8" value="${S.setPinConf}" placeholder="Ripeti" style="font-size:22px;letter-spacing:6px;text-align:center"></div>
+<label style="display:flex;align-items:center;gap:8px;margin-bottom:14px;cursor:pointer;font-size:13px">
+<input type="checkbox" id="chkR" ${S.loginRimanere?'checked':''} style="width:16px;height:16px"> Rimani connesso</label>
+<button id="setPinBtn" class="btn btn-p">✓ Imposta PIN e accedi</button>
+</div></div>`;}
+  if(S.loginStep===2){return `<div id="login-wrap"><div class="login-box">
+<div style="font-size:44px;text-align:center;margin-bottom:.5rem">🔑</div>
+<div style="font-size:20px;font-weight:700;color:var(--forest);text-align:center">Ciao, ${S._tmpVol?.nome}!</div>
+<div style="font-size:13px;color:var(--muted);text-align:center;margin:4px 0 1.4rem">Inserisci il tuo PIN</div>
+<div class="lbl">PIN</div>
+<input id="pinIn" class="inp" type="password" inputmode="numeric" maxlength="8" value="${S.loginPin}" placeholder="••••" style="font-size:26px;letter-spacing:8px;text-align:center;margin-bottom:8px">
+${S.loginErr?`<div style="color:#C62828;font-size:12px;margin-bottom:10px">⚠️ ${S.loginErr}</div>`:''}
+<div style="display:flex;gap:8px;margin-bottom:12px">
+<button id="loginBtn" class="btn btn-p" style="flex:1" ${S.loading?'disabled':''}>${S.loading?'⏳...':'Accedi'}</button>
+<button id="backBtn" class="btn btn-g">← Indietro</button></div>
+<label style="display:flex;align-items:center;gap:8px;justify-content:center;cursor:pointer;font-size:13px;color:var(--muted)">
+<input type="checkbox" id="chkR" ${S.loginRimanere?'checked':''} style="width:16px;height:16px"> Rimani connesso</label>
+</div></div>`;}
+  return `<div id="login-wrap"><div class="login-box">
+<div style="font-size:48px;text-align:center;margin-bottom:.5rem">🐾</div>
+<div style="font-size:21px;font-weight:700;color:var(--forest);text-align:center">Gaia Animali & Ambiente</div>
+<div style="font-size:13px;color:var(--muted);text-align:center;margin:4px 0 .3rem;font-weight:600">Colonie Basiglio · Milano 3</div>
+<div style="font-size:13px;color:var(--muted);text-align:center;margin:0 0 1.5rem">Inserisci il tuo codice fiscale</div>
+<div class="lbl">Codice fiscale</div>
+<input id="cfIn" class="inp" type="text" value="${S.loginCF}" placeholder="Es. RSSMRA80A01H501Z" maxlength="16" autocomplete="off" style="font-family:monospace;font-size:16px;text-transform:uppercase;margin-bottom:8px">
+${S.loginErr?`<div style="color:#C62828;font-size:12px;margin-bottom:10px">⚠️ ${S.loginErr}</div>`:''}
+<button id="loginBtn" class="btn btn-p" ${S.loading?'disabled':''}>${S.loading?'⏳ Ricerca...':'Continua →'}</button>
+<p style="text-align:center;font-size:12px;color:#bbb;margin-top:14px">Non riesci? Contatta il coordinatore</p>
+</div></div>`;};
+
+const setupHTML=()=>`<div id="login-wrap"><div class="login-box">
+<div style="font-size:40px;text-align:center;margin-bottom:.5rem">⚙️</div>
+<div style="font-size:20px;font-weight:700;color:var(--forest);text-align:center;margin-bottom:.5rem">Prima configurazione</div>
+<div style="font-size:13px;color:var(--muted);text-align:center;margin-bottom:1rem">Crea il primo account Coordinatore</div>
+<div style="background:var(--lblue);border-radius:8px;padding:10px;margin-bottom:12px;font-size:13px">CF: <code>${S.setupCF}</code></div>
+<div class="g2" style="margin-bottom:10px">
+<div><div class="lbl">Nome</div><input id="sNome" class="inp" value="${S.setupNome}" placeholder="Nome"></div>
+<div><div class="lbl">Cognome</div><input id="sCog" class="inp" value="${S.setupCognome}" placeholder="Cognome"></div>
+</div>
+<button id="setupBtn" class="btn btn-p">Crea account Coordinatore</button>
+</div></div>`;
+
+// ── BACHECA ───────────────────────────────────────────────────────────────────
+const bachecaHTML=()=>{
+  const isP=can(S.user,'coordinatore','referente_colonia');
+  const banner=S._newComm?`<div style="background:#FFF3E0;border:1.5px solid #FFC107;border-radius:10px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px"><span style="font-size:20px">🔔</span><div style="flex:1"><div style="font-size:13px;font-weight:700;color:#E65100">Ci sono nuovi messaggi!</div></div><button onclick="S._newComm=false;render()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#888">✕</button></div>`:'';
+  // alert turni scoperti
+  const scoperti=getTurniScoperti();
+  const alertScop=scoperti.length?`<div class="alert-turni">
+    <div class="alert-title">⚠️ Turni scoperti nei prossimi ${SOGLIA_ALERT_GIORNI} giorni (${scoperti.length})</div>
+    ${scoperti.slice(0,6).map(t=>`<div class="alert-item"><span>${t.emoji} <strong>${t.coloniaNome}</strong> — ${fmtL(t.date)}</span>
+      ${isP?`<button class="btn btn-sm btn-o" onclick="S.page='calendario';S.selDate='${t.date}';S.selColonia='${t.coloniaId}';render()">📅 Vai</button>`:''}
+    </div>`).join('')}
+    ${scoperti.length>6?`<div style="font-size:12px;color:var(--orange);margin-top:6px">+ altri ${scoperti.length-6} giorni scoperti</div>`:''}
+  </div>`:'';
+  // alert conflitti indisponibilità
+  const conflitti=getConflittiIndisp();
+  const alertConfl=conflitti.length&&isP?`<div class="alert-indisp">
+    <div class="alert-title">🔄 Conflitti indisponibilità (${conflitti.length})</div>
+    ${conflitti.map(c=>`<div class="alert-item"><span>👤 <strong>${c.shift.volunteerCognome} ${c.shift.volunteerNome}</strong> — ${c.shift.coloniaNome} — ${fmtL(c.shift.date)}</span>
+      <button class="btn btn-sm btn-r" data-rmsid="${c.shift.id}">🗑 Rimuovi turno</button>
+    </div>`).join('')}
+  </div>`:'';
+  const form=isP&&S.addCom?`<div class="card" style="border:1.5px solid var(--border)">
+<div style="margin-bottom:8px"><div class="lbl">Titolo</div><input id="fComTitolo" class="inp" value="${S.fcom.titolo}" placeholder="Titolo"></div>
+<div style="margin-bottom:10px"><div class="lbl">Testo</div><textarea id="fComTesto" class="inp" rows="4" style="resize:vertical;line-height:1.6" placeholder="Testo...">${S.fcom.testo}</textarea></div>
+<label style="display:flex;align-items:center;gap:8px;margin-bottom:12px;cursor:pointer"><input type="checkbox" id="fComImp" ${S.fcom.importante?'checked':''} style="width:16px;height:16px"><span style="font-size:13px;font-weight:500">⭐ Importante</span></label>
+<div style="display:flex;gap:8px"><button id="btnSaveCom" class="btn btn-p" style="flex:1">✓ Pubblica</button><button id="btnCancelCom" class="btn btn-g">Annulla</button></div></div>`:'';
+  const msgs=S.comms.length===0?'<div class="empty">Nessuna comunicazione</div>':S.comms.map(c=>`
+<div class="card" style="${c.importante?'border:1.5px solid #FFC107;background:#FFFDE7':''}">
+<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px">
+<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+${c.importante?'<span>⭐</span>':''}
+<span style="font-size:15px;font-weight:700;color:var(--forest)">${c.titolo}</span>
+${c.importante?'<span style="font-size:10px;font-weight:700;background:#FFC107;color:#333;padding:2px 8px;border-radius:999px">IMPORTANTE</span>':''}
+</div>
+${isP?`<div style="display:flex;gap:4px;flex-shrink:0"><button class="btn btn-g btn-sm" data-toggleimp="${c.id}">${c.importante?'★':'☆'}</button><button class="btn btn-r btn-sm" data-removecom="${c.id}">🗑</button></div>`:''}
+</div>
+<div style="font-size:14px;line-height:1.6;white-space:pre-wrap">${c.testo}</div>
+<div style="font-size:11px;color:var(--muted);margin-top:8px">${c.createdByNome} · ${fmtTs(c.createdAt)}</div>
+</div>`).join('');
+  return `${banner}${alertScop}${alertConfl}<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><div class="sec-title" style="margin:0">📢 Bacheca</div>${isP&&!S.addCom?`<button id="btnNewCom" class="btn btn-p btn-sm">+ Nuova</button>`:''}</div>${form}${msgs}`;};
+
+// ── CALENDARIO ────────────────────────────────────────────────────────────────
+const calHTML=()=>{
+  const isP=can(S.user,'coordinatore','referente_colonia');
+  // selettore colonia
+  const colSel=`<div class="tab-row">${S.colonie.map(c=>`<button class="tab${S.selColonia===c.id?' on':''}" data-colsel="${c.id}">${c.emoji} ${c.nome}</button>`).join('')}</div>`;
+  return `${colSel}<div class="view-toggle">
+<button class="vt${S.calView==='settimanale'?' on':''}" data-cv="settimanale">Settimanale</button>
+<button class="vt${S.calView==='giornaliero'?' on':''}" data-cv="giornaliero">Giornaliero</button>
+</div>${S.calView==='settimanale'?calSettHTML():calGiornoHTML()}`;};
+
+const calSettHTML=()=>{
+  const days=wkDays(S.selWeekMon),tod=today();
+  const prev=addDays(S.selWeekMon,-7),next=addDays(S.selWeekMon,7);
+  const col=S.selColonia;
+  const scop=getTurniScoperti();
+  const rows=`
+<div class="wg-lbl">Turno</div>
+${days.map(d=>{
+  const ns=S.shifts.filter(s=>s.date===d&&s.coloniaId===col);
+  const haIndisp=S.indisponibilita.some(i=>i.date===d&&i.coloniaId===col);
+  const isScopert=scop.some(s=>s.date===d&&s.coloniaId===col);
+  return `<div class="wg-cell${isScopert?' scoperto':''}" data-openday="${d}">
+${ns.length===0?`<div style="color:#bbb;font-size:10px;text-align:center;padding:4px">${haIndisp?'⚠️':''}</div>`:''}
+${ns.map(s=>{
+  const mine=s.volunteerId===S.user.id;
+  const ind=S.indisponibilita.find(i=>i.volunteerId===s.volunteerId&&i.date===d&&i.coloniaId===col);
+  return`<div style="font-size:10px;padding:2px 3px;border-radius:4px;margin:1px;${mine?'background:var(--lblue);color:var(--forest);font-weight:700':'background:#f0f0f0;color:#555'}${ind?';text-decoration:line-through;opacity:.6':''}" title="${s.volunteerCognome} ${s.volunteerNome}">
+    ${s.volunteerCognome.substring(0,7)}${ind?' ⚠️':''}
+  </div>`;}).join('')}
+</div>`;}).join('')}`;
+  return `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+<button class="btn btn-g btn-sm" id="prevW" data-mon="${prev}">‹ Prec</button>
+<div style="font-size:13px;font-weight:700;color:var(--forest)">${fmtS(S.selWeekMon)} – ${fmtS(addDays(S.selWeekMon,6))}</div>
+<button class="btn btn-g btn-sm" id="nextW" data-mon="${next}">Succ ›</button>
+</div>
+<div class="wg">
+<div class="wg-hdr"></div>${days.map(d=>`<div class="wg-hdr${d===tod?' tod':''}">${DOWS[(new Date(d).getDay()+6)%7]}<br>${fromYMD(d).getDate()}</div>`).join('')}
+${rows}
+</div>
+<div style="font-size:11px;color:var(--muted);margin-top:8px">🟡 = turno scoperto &nbsp;⚠️ = indisponibilità segnalata &nbsp; Tocca un giorno per dettagli</div>`;};
+
+const calGiornoHTML=()=>{
+  const d=S.selDate,tod=today(),col=S.selColonia;
+  const colObj=S.colonie.find(c=>c.id===col);
+  const turni=S.shifts.filter(s=>s.date===d&&s.coloniaId===col);
+  const indisp=S.indisponibilita.filter(i=>i.date===d&&i.coloniaId===col);
+  const isP=can(S.user,'coordinatore','referente_colonia');
+  const isMine=turni.find(s=>s.volunteerId===S.user.id);
+  const myIndisp=indisp.find(i=>i.volunteerId===S.user.id);
+  const volsInColonia=S.vols.filter(v=>(v.coloniaIds||[]).includes(col)||can(S.user,'coordinatore'));
+  return `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+<button class="btn btn-g btn-sm" id="prevD" data-date="${addDays(d,-1)}">‹ Prec</button>
+<div style="font-size:13px;font-weight:700;color:var(--forest)">${fmtL(d)}</div>
+<button class="btn btn-g btn-sm" id="nextD" data-date="${addDays(d,1)}">Succ ›</button>
+</div>
+${d!==tod?`<button class="btn btn-g btn-sm" id="btnToday" style="width:100%;margin-bottom:10px">Oggi</button>`:''}
+<div class="card">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+<div style="font-size:14px;font-weight:700">${colObj?.emoji||'🐱'} Turno ${colObj?.nome||col}</div>
+${d>=tod&&!isMine&&!myIndisp?`<button class="btn btn-gr btn-sm" data-addshift="${d}" data-col="${col}">+ Sono disponibile</button>`:''}
+${d>=tod&&!isMine&&!myIndisp?`<button class="btn btn-o btn-sm" data-addindisp="${d}">Segnala indisponibilità</button>`:''}
+</div>
+${turni.length===0?`<div style="color:var(--muted);font-size:13px">Nessun volontario iscritto</div>`:''}
+${turni.map(s=>{
+  const mine=s.volunteerId===S.user.id;
+  const ind=indisp.find(i=>i.volunteerId===s.volunteerId);
+  return`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid #f0f0f0">
+    <div>
+      <span style="font-size:13px;font-weight:${mine?'700':'500'};${ind?'text-decoration:line-through;color:var(--orange)':''}">${mine?'👤 ':''}${s.volunteerCognome} ${s.volunteerNome}</span>
+      ${ind?`<span style="font-size:11px;color:var(--orange);margin-left:4px">⚠️ Indisponibile${ind.motivo?' — '+ind.motivo:''}</span>`:''}
+    </div>
+    ${mine&&d>=tod?`<button class="btn btn-r btn-sm" data-rmsid="${s.id}">Rimuoviti</button>`:''}
+    ${isP&&!mine&&d>=tod?`<button class="btn btn-r btn-sm" data-rmsid="${s.id}">🗑</button>`:''}
+  </div>`;}).join('')}
+${isP&&d>=tod?`<div style="margin-top:10px;display:flex;gap:6px">
+<select id="addVolSel_${d}" class="inp" style="flex:1">
+  <option value="">— Aggiungi volontario —</option>
+  ${volsInColonia.filter(v=>!turni.find(s=>s.volunteerId===v.id)).map(v=>`<option value="${v.id}">${v.cognome} ${v.nome}</option>`).join('')}
+</select>
+<button class="btn btn-p btn-sm" data-addvolshift="${d}" data-col="${col}" style="width:auto">+ Aggiungi</button>
+</div>`:''}
+</div>
+${indisp.length?`<div class="card">
+<div style="font-size:13px;font-weight:700;margin-bottom:8px">⚠️ Indisponibilità segnalate</div>
+${indisp.map(i=>`<div style="font-size:12px;padding:4px 0;border-bottom:1px solid #f0f0f0">
+<strong>${i.volunteerCognome} ${i.volunteerNome}</strong>${i.motivo?' — '+i.motivo:''}
+${(S.user.id===i.volunteerId||isP)?`<button class="btn btn-r btn-sm" style="float:right" data-remindisp="${i.id}">🗑</button>`:''}
+</div>`).join('')}
+</div>`:''}`;};
+
+// ── IO (miei turni) ───────────────────────────────────────────────────────────
+const ioHTML=()=>{
+  const uid=S.user.id;
+  const miei=S.shifts.filter(s=>s.volunteerId===uid&&s.date>=today())
+    .sort((a,b)=>a.date.localeCompare(b.date));
+  const myIndisp=S.indisponibilita.filter(i=>i.volunteerId===uid&&i.date>=today())
+    .sort((a,b)=>a.date.localeCompare(b.date));
+  return `<div class="sec-title">👤 I miei prossimi turni</div>
+${miei.length===0?'<div class="empty">Nessun turno programmato</div>':miei.map(s=>{
+  const col=S.colonie.find(c=>c.id===s.coloniaId);
+  const ind=S.indisponibilita.find(i=>i.volunteerId===uid&&i.date===s.date&&i.coloniaId===s.coloniaId);
+  return`<div class="card" style="${ind?'border:1.5px solid var(--orange);background:#FFF8F0':''}">
+<div style="display:flex;align-items:center;justify-content:space-between">
+<div>
+  <div style="font-size:14px;font-weight:700">${col?.emoji||'🐱'} ${col?.nome||s.coloniaId}</div>
+  <div style="font-size:13px;color:var(--muted);margin-top:2px">${fmtL(s.date)}</div>
+  ${ind?`<div style="font-size:12px;color:var(--orange);margin-top:4px">⚠️ Hai segnalato indisponibilità${ind.motivo?' — '+ind.motivo:''}</div>`:''}
+</div>
+<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+<button class="btn btn-r btn-sm" data-rmsid="${s.id}">Rimuoviti</button>
+${!ind?`<button class="btn btn-o btn-sm" data-addindisp="${s.date}" data-col="${s.coloniaId}">⚠️ Non posso</button>`:''}
+</div>
+</div>
+</div>`;}).join('')}
+<div class="sec-title" style="margin-top:16px">⚠️ Le mie indisponibilità</div>
+${S.addIndisp?`<div class="card" style="border:1.5px solid var(--border)">
+<div class="g2">
+<div><div class="lbl">Data</div><input type="date" id="fIndDate" class="inp" value="${S.findisp.date}" min="${today()}"></div>
+<div><div class="lbl">Colonia</div><select id="fIndCol" class="inp">
+${S.colonie.map(c=>`<option value="${c.id}" ${S.findisp.coloniaId===c.id?'selected':''}>${c.emoji} ${c.nome}</option>`).join('')}
+</select></div>
+</div>
+<div><div class="lbl">Motivo (opzionale)</div><input id="fIndMot" class="inp" value="${S.findisp.motivo}" placeholder="Es. impegni personali"></div>
+<div style="display:flex;gap:8px;margin-top:10px"><button id="btnSvIndisp" class="btn btn-o" style="flex:1">⚠️ Segnala</button><button id="btnCxIndisp" class="btn btn-g">Annulla</button></div>
+</div>`:`<button class="btn btn-o" id="btnNwIndisp">+ Segnala indisponibilità</button>`}
+${myIndisp.length?`<div style="margin-top:10px">${myIndisp.map(i=>{const col=S.colonie.find(c=>c.id===i.coloniaId);return`<div class="card" style="padding:10px;border:1.5px solid #FFB74D;background:#FFF8F0">
+<div style="display:flex;align-items:center;justify-content:space-between">
+<div><div style="font-size:13px;font-weight:700">${col?.emoji||'🐱'} ${col?.nome||i.coloniaId} — ${fmtL(i.date)}</div>
+${i.motivo?`<div style="font-size:12px;color:var(--muted)">${i.motivo}</div>`:''}</div>
+<button class="btn btn-r btn-sm" data-remindisp="${i.id}">🗑</button>
+</div></div>`;}).join('')}</div>`:''}`;};
+
+// ── COLONIE ───────────────────────────────────────────────────────────────────
+const colonieHTML=()=>{
+  const isP=can(S.user,'coordinatore');
+  const colSel=`<div class="colony-grid">${S.colonie.map(c=>`
+<div class="colony-card${S.selColonia===c.id?' sel':''}" data-selcol="${c.id}">
+<div class="colony-icon">${c.emoji}</div>
+<div class="colony-name">${c.nome}</div>
+<div class="colony-info">${S.gatti.filter(g=>g.coloniaId===c.id).length} gatti</div>
+</div>`).join('')}</div>`;
+  const col=S.colonie.find(c=>c.id===S.selColonia)||S.colonie[0];
+  if(!col)return colSel+'<div class="empty">Nessuna colonia disponibile</div>';
+  const gattiCol=S.gatti.filter(g=>g.coloniaId===col.id);
+  const volsCol=S.vols.filter(v=>(v.coloniaIds||[]).includes(col.id));
+  const tabs=`<div class="tab-row">
+<button class="tab${S.coloniaTab==='gatti'?' on':''}" data-coltab="gatti">🐱 Gatti (${gattiCol.length})</button>
+<button class="tab${S.coloniaTab==='volontari'?' on':''}" data-coltab="volontari">👥 Volontari (${volsCol.length})</button>
+</div>`;
+  let content='';
+  if(S.coloniaTab==='gatti'){
+    const formCat=S.addCat&&isP?`<div class="card" style="border:1.5px solid var(--border)">
+<div class="g2">
+<div><div class="lbl">Nome</div><input id="fcNome" class="inp" value="${S.fcat.nome}" placeholder="Nome gatto"></div>
+<div><div class="lbl">Sesso</div><select id="fcSesso" class="inp"><option value="M" ${S.fcat.sesso==='M'?'selected':''}>M</option><option value="F" ${S.fcat.sesso==='F'?'selected':''}>F</option></select></div>
+</div>
+<div class="g2">
+<div><div class="lbl">Colore/manto</div><input id="fcColore" class="inp" value="${S.fcat.colore}" placeholder="Es. Grigio tigrato"></div>
+<div><div class="lbl">Data ingresso</div><input type="date" id="fcData" class="inp" value="${S.fcat.dataIngresso}"></div>
+</div>
+<label style="display:flex;align-items:center;gap:8px;margin-bottom:10px;cursor:pointer">
+<input type="checkbox" id="fcSter" ${S.fcat.sterilizzato?'checked':''} style="width:16px;height:16px"><span style="font-size:13px">Sterilizzato/a</span></label>
+<div><div class="lbl">Note</div><textarea id="fcNote" class="inp" rows="2" placeholder="Note...">${S.fcat.note}</textarea></div>
+<div style="display:flex;gap:8px;margin-top:10px"><button id="btnSvCat" class="btn btn-p" style="flex:1">✓ Aggiungi</button><button id="btnCxCat" class="btn btn-g">Annulla</button></div>
+</div>`:'';
+    const lista=gattiCol.length===0?'<div class="empty">Nessun gatto registrato per questa colonia</div>':
+    `<div class="cat-grid">${gattiCol.map(g=>`<div class="cat-card${g.sterilizzato?' steril':''}" data-catdetail="${g.id}">
+<div class="cat-icon">🐱</div>
+<div class="cat-name">${g.nome}</div>
+<div class="cat-info">${g.sesso} · ${g.colore||'—'}</div>
+${g.sterilizzato?`<div style="font-size:9px;color:#388E3C;margin-top:2px">✓ sterilizzato</div>`:''}
+</div>`).join('')}</div>`;
+    content=`${isP&&!S.addCat?`<div style="text-align:right;margin-bottom:10px"><button class="btn btn-p btn-sm" id="btnNwCat">+ Aggiungi gatto</button></div>`:''}${formCat}${lista}`;
+  }else{
+    content=volsCol.length===0?'<div class="empty">Nessun volontario assegnato a questa colonia</div>':
+    volsCol.map(v=>`<div class="card" style="padding:10px;display:flex;align-items:center;justify-content:space-between">
+<div>
+<div style="font-size:14px;font-weight:700">${v.cognome} ${v.nome}</div>
+<div style="font-size:12px;color:var(--muted)">${rlLabel(v)}</div>
+</div>
+<span class="colonia-badge">${col.emoji} ${col.nome}</span>
+</div>`).join('');
+  }
+  return `${colSel}<div class="card" style="border-left:4px solid var(--forest)">
+<div style="font-size:16px;font-weight:700;color:var(--forest)">${col.emoji} Colonia ${col.nome}</div>
+<div style="font-size:12px;color:var(--muted);margin-top:4px">${gattiCol.length} gatti · ${volsCol.length} volontari</div>
+</div>${tabs}${content}`;};
+
+// ── VOLONTARI ─────────────────────────────────────────────────────────────────
+const volontariHTML=()=>{
+  const isP=can(S.user,'coordinatore');
+  const filterTabs=`<div class="tab-row">
+<button class="tab${S.volColoniaFilter==='tutte'?' on':''}" data-volf="tutte">Tutti</button>
+${S.colonie.map(c=>`<button class="tab${S.volColoniaFilter===c.id?' on':''}" data-volf="${c.id}">${c.emoji} ${c.nome}</button>`).join('')}
+</div>`;
+  const filtrati=S.volColoniaFilter==='tutte'?S.vols:S.vols.filter(v=>(v.coloniaIds||[]).includes(S.volColoniaFilter));
+  const formAdd=isP?`<div class="card" style="margin-bottom:12px;border:1.5px solid var(--border)">
+<div class="sec-title" style="margin-bottom:10px">+ Aggiungi volontario</div>
+<div class="g2">
+<div><div class="lbl">Nome</div><input id="fvNome" class="inp" value="${S.fv.nome}" placeholder="Nome"></div>
+<div><div class="lbl">Cognome</div><input id="fvCog" class="inp" value="${S.fv.cognome}" placeholder="Cognome"></div>
+</div>
+<div style="margin-bottom:8px"><div class="lbl">Codice Fiscale</div><input id="fvCF" class="inp" value="${S.fv.cf}" placeholder="RSSMRA80A01H501Z" style="font-family:monospace;text-transform:uppercase"></div>
+<div style="margin-bottom:8px"><div class="lbl">Ruoli</div><div class="ck-group">
+${Object.entries(RUOLI).filter(([k])=>k!=='volunteer').map(([k,v])=>`<div class="ck${(S.fv.ruoli||[]).includes(k)?' on':''}" data-fvruolo="${k}">${v.label}</div>`).join('')}
+</div></div>
+<div style="margin-bottom:10px"><div class="lbl">Colonie</div><div class="ck-group">
+${S.colonie.map(c=>`<div class="ck${(S.fv.coloniaIds||[]).includes(c.id)?' on':''}" data-fvcol="${c.id}">${c.emoji} ${c.nome}</div>`).join('')}
+</div></div>
+<button id="btnAddVol" class="btn btn-p">+ Aggiungi</button>
+</div>`:'';
+  const lista=filtrati.length===0?'<div class="empty">Nessun volontario</div>':filtrati.map(v=>{
+    const colonie=(v.coloniaIds||[]).map(id=>{const c=S.colonie.find(x=>x.id===id);return c?`<span class="colonia-badge" style="margin:2px">${c.emoji} ${c.nome}</span>`:null;}).filter(Boolean).join('');
+    const turniTot=S.shifts.filter(s=>s.volunteerId===v.id).length;
+    return`<div class="card" style="padding:12px">
+<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+<div style="flex:1">
+<div style="font-size:15px;font-weight:700">${v.cognome} ${v.nome}</div>
+<div style="font-size:12px;color:var(--muted);margin:3px 0">${rlLabel(v)} · ${turniTot} turni</div>
+<div style="margin-top:4px">${colonie||'<span style="font-size:11px;color:var(--muted)">Nessuna colonia</span>'}</div>
+${!v.approved?`<div style="font-size:11px;color:var(--red);margin-top:4px">⛔ Account bloccato</div>`:''}
+</div>
+${isP?`<div style="display:flex;flex-direction:column;gap:5px">
+<button class="btn btn-g btn-sm" data-togglevol="${v.id}">${v.approved?'⛔ Blocca':'✓ Abilita'}</button>
+<button class="btn btn-g btn-sm" data-resetpin="${v.id}">🔑 Reset PIN</button>
+<button class="btn btn-r btn-sm" data-remvol="${v.id}">🗑</button>
+</div>`:''}
+</div>
+</div>`;}).join('');
+  return `${filterTabs}${formAdd}${lista}`;};
+
+// ── EVENTI ────────────────────────────────────────────────────────────────────
+const eventiHTML=()=>{
+  const isP=can(S.user,'coordinatore','referente_colonia');
+  const tod=today();
+  const futuri=S.eventi.filter(e=>e.data>=tod).sort((a,b)=>a.data.localeCompare(b.data));
+  const passati=S.eventi.filter(e=>e.data<tod).sort((a,b)=>b.data.localeCompare(a.data));
+  const formEv=isP&&S.addEv?`<div class="card" style="border:1.5px solid var(--border)">
+<div style="margin-bottom:8px"><div class="lbl">Titolo</div><input id="fevTit" class="inp" value="${S.fev.titolo}" placeholder="Nome evento"></div>
+<div class="g2">
+<div><div class="lbl">Data</div><input type="date" id="fevData" class="inp" value="${S.fev.data}"></div>
+<div><div class="lbl">Luogo</div><input id="fevLuogo" class="inp" value="${S.fev.luogo}" placeholder="Luogo"></div>
+</div>
+<div class="g2">
+<div><div class="lbl">Ora inizio</div><input type="time" id="fevOraI" class="inp" value="${S.fev.oraI}"></div>
+<div><div class="lbl">Ora fine</div><input type="time" id="fevOraF" class="inp" value="${S.fev.oraF}"></div>
+</div>
+<div style="margin-bottom:10px"><div class="lbl">Note</div><textarea id="fevNote" class="inp" rows="2">${S.fev.note}</textarea></div>
+<div style="display:flex;gap:8px"><button id="btnSvEv" class="btn btn-p" style="flex:1">✓ Aggiungi</button><button id="btnCxEv" class="btn btn-g">Annulla</button></div>
+</div>`:'';
+  const evCard=ev=>{const mine=S.partecipazioni.find(p=>p.eventoId===ev.id&&p.volunteerId===S.user.id);
+    const partCount=S.partecipazioni.filter(p=>p.eventoId===ev.id).length;
+    return`<div class="card">
+<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px">
+<div><div style="font-size:15px;font-weight:700;color:var(--forest)">${ev.titolo}</div>
+<div style="font-size:12px;color:var(--muted)">${fmtL(ev.data)} · ${ev.oraInizio}–${ev.oraFine} · ${ev.luogo}</div></div>
+${isP?`<button class="btn btn-r btn-sm" data-remev="${ev.id}">🗑</button>`:''}
+</div>
+${ev.note?`<div style="font-size:13px;color:#555;margin-bottom:8px">${ev.note}</div>`:''}
+<div style="font-size:12px;color:var(--muted);margin-bottom:8px">👥 ${partCount} iscritti</div>
+${mine?`<button class="btn btn-r btn-sm" data-leave="${mine.id}">Rimuoviti</button>`:`
+${ev.data>=tod?`<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px">
+<input type="time" id="dalle_${ev.id}" value="" class="inp" style="width:90px;font-size:13px">
+<input type="time" id="alle_${ev.id}" value="" class="inp" style="width:90px;font-size:13px">
+<button class="btn btn-gr btn-sm" data-join="${ev.id}">✓ Partecipo</button>
+</div>`:'<div style="font-size:12px;color:var(--muted)">Evento concluso</div>'}`}
+</div>`;};
+  return `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+<div class="sec-title" style="margin:0">🎪 Eventi</div>
+${isP&&!S.addEv?`<button id="btnNwEv" class="btn btn-p btn-sm">+ Nuovo</button>`:''}
+</div>${formEv}
+${futuri.length?futuri.map(evCard).join(''):''} 
+${passati.length?`<div style="margin-top:16px"><div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px;text-transform:uppercase">Passati</div>${passati.slice(0,5).map(evCard).join('')}</div>`:''}
+${futuri.length===0&&passati.length===0?'<div class="empty">Nessun evento</div>':''}`;};
+
+// ── CESTE ─────────────────────────────────────────────────────────────────────
+const cesteHTML=()=>{
+  const isP=can(S.user,'coordinatore','referente_colonia');
+  const formCh=isP&&S.addCh?`<div class="card" style="border:1.5px solid var(--border)">
+<div style="margin-bottom:8px"><div class="lbl">Negozio</div><input id="fchNeg" class="inp" value="${S.fch.negozio}" placeholder="Nome negozio / supermercato"></div>
+<div style="margin-bottom:8px"><div class="lbl">Indirizzo</div><input id="fchInd" class="inp" value="${S.fch.indirizzo}" placeholder="Via, Città"></div>
+<div style="margin-bottom:10px"><div class="lbl">Note</div><input id="fchNote" class="inp" value="${S.fch.note}" placeholder="Note"></div>
+<div style="display:flex;gap:8px"><button id="btnSvCh" class="btn btn-p" style="flex:1">✓ Aggiungi</button><button id="btnCxCh" class="btn btn-g">Annulla</button></div>
+</div>`:'';
+  const lista=S.chest.length===0?'<div class="empty">Nessuna cesta</div>':S.chest.map(ch=>`
+<div class="card">
+<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px">
+<div><div style="font-size:15px;font-weight:700">${ch.negozio}</div>
+<div style="font-size:12px;color:var(--muted)">${ch.indirizzo}</div>
+${ch.note?`<div style="font-size:12px;margin-top:3px">${ch.note}</div>`:''}
+</div>
+${isP?`<button class="btn btn-r btn-sm" data-remch="${ch.id}">🗑</button>`:''}
+</div>
+<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+${ch.responsabileNome?`<span style="font-size:12px;color:var(--forest)">👤 ${ch.responsabileNome}</span>`:'<span style="font-size:12px;color:var(--muted)">Nessun responsabile</span>'}
+${isP?`<select class="inp" style="flex:1;font-size:12px" data-assignch="${ch.id}">
+<option value="">— Assegna —</option>
+${S.vols.map(v=>`<option value="${v.id}" ${v.id===ch.responsabileId?'selected':''}>${v.cognome} ${v.nome}</option>`).join('')}
+</select>`:''}
+</div>
+</div>`).join('');
+  return `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+<div class="sec-title" style="margin:0">🛒 Ceste</div>
+${isP&&!S.addCh?`<button id="btnNwCh" class="btn btn-p btn-sm">+ Nuova</button>`:''}
+</div>${formCh}${lista}`;};
+
+// ── PRESENZE ──────────────────────────────────────────────────────────────────
+const presenzeHTML=()=>{
+  const colSel=`<div class="tab-row">${S.colonie.map(c=>`<button class="tab${S.selColonia===c.id?' on':''}" data-colsel="${c.id}">${c.emoji} ${c.nome}</button>`).join('')}</div>`;
+  const col=S.selColonia;
+  const yr=S.selYear;
+  const vols=S.vols.filter(v=>(v.coloniaIds||[]).includes(col));
+  const contsAll=vols.map(v=>({v,tot:S.shifts.filter(s=>s.volunteerId===v.id&&s.coloniaId===col&&s.date.startsWith(String(yr))).length}))
+    .sort((a,b)=>b.tot-a.tot);
+  return `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+<div class="sec-title" style="margin:0">📊 Presenze ${yr}</div>
+<div style="display:flex;gap:6px;align-items:center">
+<button class="btn btn-g btn-sm" id="prevYr">‹</button>
+<span style="font-size:14px;font-weight:700">${yr}</span>
+<button class="btn btn-g btn-sm" id="nextYr">›</button>
+<button class="btn btn-g btn-sm" id="btnExcel">Excel</button>
+</div></div>
+${colSel}
+<div class="tw"><table class="tbl">
+<thead><tr><th>Cognome</th><th>Nome</th>${MONTHS.map(m=>`<th>${m.substring(0,3)}</th>`).join('')}<th>Tot</th></tr></thead>
+<tbody>${contsAll.map(({v,tot})=>{
+  const mesi=MONTHS.map((_,mi)=>S.shifts.filter(s=>s.volunteerId===v.id&&s.coloniaId===col&&s.date.startsWith(`${yr}-${String(mi+1).padStart(2,'0')}`)).length);
+  return`<tr><td>${v.cognome}</td><td>${v.nome}</td>${mesi.map(n=>`<td><span class="badge ${bc(n)}">${n}</span></td>`).join('')}<td><strong>${tot}</strong></td></tr>`;}).join('')}
+</tbody></table></div>`;};
+
+// ── ADMIN ─────────────────────────────────────────────────────────────────────
+const adminHTML=()=>{
+  if(!can(S.user,'coordinatore'))return'<div class="empty">Accesso riservato</div>';
+  const formColonia=S.addColonia?`<div class="card" style="border:1.5px solid var(--border)">
+<div class="g2">
+<div><div class="lbl">Nome colonia</div><input id="fcolNome" class="inp" value="${S.fNewColonia.nome}" placeholder="Es. Parco Nord"></div>
+<div><div class="lbl">Emoji</div><input id="fcolEmoji" class="inp" value="${S.fNewColonia.emoji}" placeholder="🐱" style="font-size:24px;text-align:center"></div>
+</div>
+<div style="display:flex;gap:8px;margin-top:8px"><button id="btnSvColonia" class="btn btn-p" style="flex:1">✓ Crea</button><button id="btnCxColonia" class="btn btn-g">Annulla</button></div>
+</div>`:'';
+  return `<div class="sec-title">⚙️ Gestione</div>
+<div class="card">
+<div style="font-size:14px;font-weight:700;margin-bottom:10px">🐱 Colonie (${S.colonie.length})</div>
+${S.colonie.map(c=>`<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #f0f0f0">
+<span style="font-size:20px">${c.emoji}</span>
+<span style="font-size:14px;font-weight:600;flex:1">${c.nome}</span>
+<span style="font-size:12px;color:var(--muted)">${S.gatti.filter(g=>g.coloniaId===c.id).length} gatti</span>
+</div>`).join('')}
+${!S.addColonia?`<button class="btn btn-p btn-sm" id="btnNwColonia" style="margin-top:10px;width:100%">+ Nuova colonia</button>`:''}
+${formColonia}
+</div>
+<div class="card">
+<div style="font-size:14px;font-weight:700;margin-bottom:10px">👥 Riepilogo volontari</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+${[{l:'Totale volontari',n:S.vols.length},{l:'Account attivi',n:S.vols.filter(v=>v.approved).length},
+{l:'Turni totali anno',n:S.shifts.filter(s=>s.date.startsWith(String(S.selYear))).length},
+{l:'Gatti registrati',n:S.gatti.length}].map(({l,n})=>`<div class="stat"><div class="stat-n">${n}</div><div class="stat-l">${l}</div></div>`).join('')}
+</div>
+</div>
+<div class="card">
+<div style="font-size:14px;font-weight:700;margin-bottom:10px">⚠️ Alert turni scoperti</div>
+<div style="font-size:13px;color:var(--muted)">Soglia avviso: <strong>${SOGLIA_ALERT_GIORNI} giorni</strong></div>
+<div style="font-size:13px;margin-top:6px">Turni scoperti nei prossimi ${SOGLIA_ALERT_GIORNI} giorni: <strong style="color:${getTurniScoperti().length>0?'var(--orange)':'var(--green)'}">${getTurniScoperti().length}</strong></div>
+</div>`;};
+
+// ── BIND EVENTS ───────────────────────────────────────────────────────────────
+const bindLogin=()=>{
+  const ci=document.getElementById('cfIn');
+  if(ci){ci.addEventListener('input',e=>{S.loginCF=e.target.value;S.loginErr='';});
+    ci.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});ci.focus();}
+  const pi=document.getElementById('pinIn');
+  if(pi){pi.addEventListener('input',e=>{S.loginPin=e.target.value;S.loginErr='';});
+    pi.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});pi.focus();}
+  document.getElementById('loginBtn')?.addEventListener('click',doLogin);
+  document.getElementById('backBtn')?.addEventListener('click',()=>{S.loginStep=1;S.loginPin='';S.loginErr='';S._tmpVol=null;render();});
+  document.getElementById('chkR')?.addEventListener('change',e=>S.loginRimanere=e.target.checked);
+  const pn=document.getElementById('pinNew');
+  if(pn){pn.addEventListener('input',e=>S.setPinNew=e.target.value);pn.focus();}
+  document.getElementById('pinConf')?.addEventListener('input',e=>S.setPinConf=e.target.value);
+  document.getElementById('setPinBtn')?.addEventListener('click',doSetPin);};
+const bindSetup=()=>{
+  document.getElementById('sNome')?.addEventListener('input',e=>S.setupNome=e.target.value);
+  document.getElementById('sCog')?.addEventListener('input',e=>S.setupCognome=e.target.value);
+  document.getElementById('setupBtn')?.addEventListener('click',doSetupAdmin);};
+
+const bindPage=()=>{
+  document.getElementById('sheet-overlay')?.addEventListener('click',e=>{if(e.target.id==='sheet-overlay')closeSheet();});
+  document.getElementById('drawer-overlay')?.addEventListener('click',closeDrawer);
+  // calendario
+  document.querySelectorAll('[data-cv]').forEach(b=>b.addEventListener('click',e=>{S.calView=e.currentTarget.dataset.cv;render();}));
+  document.querySelectorAll('[data-colsel]').forEach(b=>b.addEventListener('click',e=>{S.selColonia=e.currentTarget.dataset.colsel;render();}));
+  document.getElementById('prevW')?.addEventListener('click',async e=>{S.selWeekMon=e.currentTarget.dataset.mon;await loadShifts(S.selWeekMon,addDays(S.selWeekMon,6));render();});
+  document.getElementById('nextW')?.addEventListener('click',async e=>{S.selWeekMon=e.currentTarget.dataset.mon;await loadShifts(S.selWeekMon,addDays(S.selWeekMon,6));render();});
+  document.getElementById('prevD')?.addEventListener('click',async e=>{S.selDate=e.currentTarget.dataset.date;render();});
+  document.getElementById('nextD')?.addEventListener('click',async e=>{S.selDate=e.currentTarget.dataset.date;render();});
+  document.getElementById('btnToday')?.addEventListener('click',async()=>{S.selDate=today();render();});
+  // click su giorno in settimana
+  document.querySelectorAll('[data-openday]').forEach(b=>b.addEventListener('click',e=>{
+    S.selDate=e.currentTarget.dataset.openday;S.calView='giornaliero';render();}));
+  // turni
+  document.querySelectorAll('[data-addshift]').forEach(b=>b.addEventListener('click',e=>{
+    const date=e.currentTarget.dataset.addshift,col=e.currentTarget.dataset.col||S.selColonia;
+    doAddShift(date,col);}));
+  document.querySelectorAll('[data-addvolshift]').forEach(b=>b.addEventListener('click',e=>{
+    const date=e.currentTarget.dataset.addvolshift,col=e.currentTarget.dataset.col||S.selColonia;
+    const sel=document.getElementById('addVolSel_'+date);if(sel?.value)doAddShift(date,col,sel.value);else toast('Seleziona un volontario','warn');}));
+  document.querySelectorAll('[data-rmsid]').forEach(b=>b.addEventListener('click',e=>doRemShift(e.currentTarget.dataset.rmsid)));
+  // indisponibilità
+  document.querySelectorAll('[data-addindisp]').forEach(b=>b.addEventListener('click',e=>{
+    S.findisp.date=e.currentTarget.dataset.addindisp;
+    S.findisp.coloniaId=e.currentTarget.dataset.col||S.selColonia;
+    S.addIndisp=true;S.page='io';render();}));
+  document.querySelectorAll('[data-remindisp]').forEach(b=>b.addEventListener('click',e=>doRemIndisp(e.currentTarget.dataset.remindisp)));
+  document.getElementById('btnNwIndisp')?.addEventListener('click',()=>{S.addIndisp=true;render();});
+  document.getElementById('btnCxIndisp')?.addEventListener('click',()=>{S.addIndisp=false;render();});
+  document.getElementById('fIndDate')?.addEventListener('input',e=>S.findisp.date=e.target.value);
+  document.getElementById('fIndCol')?.addEventListener('change',e=>S.findisp.coloniaId=e.target.value);
+  document.getElementById('fIndMot')?.addEventListener('input',e=>S.findisp.motivo=e.target.value);
+  document.getElementById('btnSvIndisp')?.addEventListener('click',doAddIndisp);
+  // bacheca
+  document.getElementById('btnNewCom')?.addEventListener('click',()=>{S.addCom=true;render();});
+  document.getElementById('btnCancelCom')?.addEventListener('click',()=>{S.addCom=false;render();});
+  document.getElementById('fComTitolo')?.addEventListener('input',e=>S.fcom.titolo=e.target.value);
+  document.getElementById('fComTesto')?.addEventListener('input',e=>S.fcom.testo=e.target.value);
+  document.getElementById('fComImp')?.addEventListener('change',e=>S.fcom.importante=e.target.checked);
+  document.getElementById('btnSaveCom')?.addEventListener('click',doAddComm);
+  document.querySelectorAll('[data-toggleimp]').forEach(b=>b.addEventListener('click',e=>doToggleImp(e.currentTarget.dataset.toggleimp)));
+  document.querySelectorAll('[data-removecom]').forEach(b=>b.addEventListener('click',e=>{if(confirm('Rimuovere?'))doRemComm(e.currentTarget.dataset.removecom);}));
+  // alert conflitti bacheca
+  document.querySelectorAll('[data-rmsid]').forEach(b=>b.addEventListener('click',e=>doRemShift(e.currentTarget.dataset.rmsid)));
+  // volontari
+  document.querySelectorAll('[data-volf]').forEach(b=>b.addEventListener('click',e=>{S.volColoniaFilter=e.currentTarget.dataset.volf;render();}));
+  document.getElementById('fvNome')?.addEventListener('input',e=>S.fv.nome=e.target.value);
+  document.getElementById('fvCog')?.addEventListener('input',e=>S.fv.cognome=e.target.value);
+  document.getElementById('fvCF')?.addEventListener('input',e=>S.fv.cf=e.target.value);
+  document.querySelectorAll('[data-fvruolo]').forEach(b=>b.addEventListener('click',e=>{
+    const r=e.currentTarget.dataset.fvruolo;
+    if(S.fv.ruoli.includes(r))S.fv.ruoli=S.fv.ruoli.filter(x=>x!==r);
+    else S.fv.ruoli=[...S.fv.ruoli,r];
+    e.currentTarget.classList.toggle('on');render();}));
+  document.querySelectorAll('[data-fvcol]').forEach(b=>b.addEventListener('click',e=>{
+    const id=e.currentTarget.dataset.fvcol;
+    if((S.fv.coloniaIds||[]).includes(id))S.fv.coloniaIds=S.fv.coloniaIds.filter(x=>x!==id);
+    else S.fv.coloniaIds=[...(S.fv.coloniaIds||[]),id];
+    e.currentTarget.classList.toggle('on');render();}));
+  document.getElementById('btnAddVol')?.addEventListener('click',doAddVol);
+  document.querySelectorAll('[data-togglevol]').forEach(b=>b.addEventListener('click',e=>doToggleApproved(e.currentTarget.dataset.togglevol)));
+  document.querySelectorAll('[data-resetpin]').forEach(b=>b.addEventListener('click',e=>doResetPin(e.currentTarget.dataset.resetpin)));
+  document.querySelectorAll('[data-remvol]').forEach(b=>b.addEventListener('click',e=>{if(confirm('Eliminare?'))doRemVol(e.currentTarget.dataset.remvol);}));
+  // colonie / gatti
+  document.querySelectorAll('[data-selcol]').forEach(b=>b.addEventListener('click',e=>{S.selColonia=e.currentTarget.dataset.selcol;S.addCat=false;render();}));
+  document.querySelectorAll('[data-coltab]').forEach(b=>b.addEventListener('click',e=>{S.coloniaTab=e.currentTarget.dataset.coltab;render();}));
+  document.getElementById('btnNwCat')?.addEventListener('click',()=>{S.fcat.coloniaId=S.selColonia;S.addCat=true;render();});
+  document.getElementById('btnCxCat')?.addEventListener('click',()=>{S.addCat=false;render();});
+  document.getElementById('fcNome')?.addEventListener('input',e=>S.fcat.nome=e.target.value);
+  document.getElementById('fcSesso')?.addEventListener('change',e=>S.fcat.sesso=e.target.value);
+  document.getElementById('fcColore')?.addEventListener('input',e=>S.fcat.colore=e.target.value);
+  document.getElementById('fcData')?.addEventListener('input',e=>S.fcat.dataIngresso=e.target.value);
+  document.getElementById('fcSter')?.addEventListener('change',e=>S.fcat.sterilizzato=e.target.checked);
+  document.getElementById('fcNote')?.addEventListener('input',e=>S.fcat.note=e.target.value);
+  document.getElementById('btnSvCat')?.addEventListener('click',doAddGatto);
+  document.querySelectorAll('[data-catdetail]').forEach(b=>b.addEventListener('click',e=>{
+    const g=S.gatti.find(x=>x.id===e.currentTarget.dataset.catdetail);
+    if(!g)return;
+    const isP=can(S.user,'coordinatore');
+    openSheet(`
+<div style="font-size:20px;text-align:center;margin:8px 0">🐱</div>
+<div style="font-size:20px;font-weight:700;text-align:center;color:var(--forest)">${g.nome}</div>
+<div style="font-size:12px;text-align:center;color:var(--muted);margin-bottom:14px">${S.colonie.find(c=>c.id===g.coloniaId)?.nome||g.coloniaId}</div>
+<div class="g2" style="margin-bottom:8px">
+<div class="stat"><div class="stat-n">${g.sesso}</div><div class="stat-l">Sesso</div></div>
+<div class="stat"><div class="stat-n">${g.sterilizzato?'✓':'✗'}</div><div class="stat-l">Sterilizzato</div></div>
+</div>
+<div class="card"><div class="lbl">Colore / manto</div><div style="font-size:14px">${g.colore||'—'}</div></div>
+<div class="card"><div class="lbl">Data ingresso</div><div style="font-size:14px">${g.dataIngresso||'—'}</div></div>
+${g.note?`<div class="card"><div class="lbl">Note</div><div style="font-size:13px;line-height:1.6">${g.note}</div></div>`:''}
+${isP?`<button class="btn btn-r" style="margin-top:8px" onclick="if(confirm('Eliminare?'))doRemGatto('${g.id}')">🗑 Rimuovi gatto</button>`:''}
+    `);
+  }));
+  // eventi
+  document.getElementById('btnNwEv')?.addEventListener('click',()=>{S.addEv=true;render();});
+  document.getElementById('btnCxEv')?.addEventListener('click',()=>{S.addEv=false;render();});
+  document.getElementById('fevTit')?.addEventListener('input',e=>S.fev.titolo=e.target.value);
+  document.getElementById('fevData')?.addEventListener('input',e=>S.fev.data=e.target.value);
+  document.getElementById('fevLuogo')?.addEventListener('input',e=>S.fev.luogo=e.target.value);
+  document.getElementById('fevOraI')?.addEventListener('input',e=>S.fev.oraI=e.target.value);
+  document.getElementById('fevOraF')?.addEventListener('input',e=>S.fev.oraF=e.target.value);
+  document.getElementById('fevNote')?.addEventListener('input',e=>S.fev.note=e.target.value);
+  document.getElementById('btnSvEv')?.addEventListener('click',doAddEv);
+  document.querySelectorAll('[data-remev]').forEach(b=>b.addEventListener('click',e=>{if(confirm('Rimuovere?'))doRemEv(e.currentTarget.dataset.remev);}));
+  document.querySelectorAll('[data-join]').forEach(b=>b.addEventListener('click',e=>{
+    const evId=e.currentTarget.dataset.join;
+    const dalle=document.getElementById('dalle_'+evId)?.value||'';
+    const alle=document.getElementById('alle_'+evId)?.value||'';
+    doJoin(evId,dalle,alle);}));
+  document.querySelectorAll('[data-leave]').forEach(b=>b.addEventListener('click',e=>doLeave(e.currentTarget.dataset.leave)));
+  // ceste
+  document.getElementById('btnNwCh')?.addEventListener('click',()=>{S.addCh=true;render();});
+  document.getElementById('btnCxCh')?.addEventListener('click',()=>{S.addCh=false;render();});
+  document.getElementById('fchNeg')?.addEventListener('input',e=>S.fch.negozio=e.target.value);
+  document.getElementById('fchInd')?.addEventListener('input',e=>S.fch.indirizzo=e.target.value);
+  document.getElementById('fchNote')?.addEventListener('input',e=>S.fch.note=e.target.value);
+  document.getElementById('btnSvCh')?.addEventListener('click',doAddCh);
+  document.querySelectorAll('[data-remch]').forEach(b=>b.addEventListener('click',e=>{if(confirm('Rimuovere?'))doRemCh(e.currentTarget.dataset.remch);}));
+  document.querySelectorAll('[data-assignch]').forEach(sel=>sel.addEventListener('change',e=>{const id=e.currentTarget.dataset.assignch;if(e.target.value)doAssignCh(id,e.target.value);}));
+  // presenze
+  document.getElementById('prevYr')?.addEventListener('click',async()=>{S.selYear--;await loadYear();render();});
+  document.getElementById('nextYr')?.addEventListener('click',async()=>{S.selYear++;await loadYear();render();});
+  document.getElementById('btnExcel')?.addEventListener('click',doExcel);
+  // admin
+  document.getElementById('btnNwColonia')?.addEventListener('click',()=>{S.addColonia=true;render();});
+  document.getElementById('btnCxColonia')?.addEventListener('click',()=>{S.addColonia=false;render();});
+  document.getElementById('fcolNome')?.addEventListener('input',e=>S.fNewColonia.nome=e.target.value);
+  document.getElementById('fcolEmoji')?.addEventListener('input',e=>S.fNewColonia.emoji=e.target.value);
+  document.getElementById('btnSvColonia')?.addEventListener('click',doAddColonia);
+};
+
+// esponi doRemGatto globalmente per il sheet
+window.doRemGatto=doRemGatto;
+
+// ── PWA ───────────────────────────────────────────────────────────────────────
+window._canInstall=false;
+let _deferredPrompt=null;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();_deferredPrompt=e;window._canInstall=true;if(S.screen==='app'){render();buildSidebar();}});
+window.installApp=async()=>{if(!_deferredPrompt)return;_deferredPrompt.prompt();const r=await _deferredPrompt.userChoice;if(r.outcome==='accepted')window._canInstall=false;_deferredPrompt=null;};
+
+// ── SERVICE WORKER + PUSH ─────────────────────────────────────────────────────
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('/sw.js').then(reg=>{
+    window.richiestaNotifiche=async()=>{
+      const perm=await Notification.requestPermission();
+      if(perm!=='granted')return false;
+      try{
+        const VAPID_PUB='BJAM0c-fDZAKIMjq-h2RZCLFYowXUb-NSgaovO5Sb7SpzuAF1YsY6sRPHSZrL_zGkWRB0br9_1v8MLEynvhXx_U';
+        const sub=await reg.pushManager.subscribe({
+          userVisibleOnly:true,
+          applicationServerKey:VAPID_PUB
+        });
+        const existing=await getDocs(query(collection(db,'push_subscriptions'),where('endpoint','==',sub.endpoint)));
+        if(existing.empty&&S.user){
+          await addDoc(collection(db,'push_subscriptions'),{
+            ...sub.toJSON(),userId:S.user.id,createdAt:serverTimestamp()
+          });
+        }
+        return true;
+      }catch(e){console.error('[PUSH]',e);return false;}
+    };
+  }).catch(e=>console.error('[SW]',e));
+}
+
+// ── BOOT ──────────────────────────────────────────────────────────────────────
+(async()=>{
+  const savedId=localStorage.getItem('savedUser');
+  if(savedId){
+    try{
+      const s=await getDocs(collection(db,'volunteers'));
+      const vDoc=s.docs.find(d=>d.id===savedId);
+      if(vDoc&&vDoc.data().approved){await afterLogin({id:vDoc.id,...vDoc.data()});render();return;}
+      else localStorage.removeItem('savedUser');
+    }catch(e){localStorage.removeItem('savedUser');}
+  }
+  render();
+})();
+</script>
+</body>
+</html>
