@@ -800,7 +800,10 @@ const calGiornoHTML=()=>{
   const isP=can(S.user,'coordinatore','referente_colonia');
   const isMine=turni.find(s=>s.volunteerId===S.user.id);
   const myIndisp=indisp.find(i=>i.volunteerId===S.user.id);
-  const volsInColonia=S.vols.filter(v=>(v.coloniaIds||[]).includes(col)||can(S.user,'coordinatore'));
+  // Un volontario è "di questa colonia" se ha coloniaId nell'array o è admin
+  const sonoInQuestaColonia=isP||(S.user.coloniaIds||[]).includes(col);
+  // Dropdown admin: mostra TUTTI i volontari approvati non ancora in turno
+  const tuttiVols=S.vols.filter(v=>v.approved&&!turni.find(s=>s.volunteerId===v.id));
   return `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
 <button class="btn btn-g btn-sm" id="prevD" data-date="${addDays(d,-1)}">‹ Prec</button>
 <div style="font-size:13px;font-weight:700;color:var(--forest)">${fmtL(d)}</div>
@@ -810,38 +813,79 @@ ${d!==tod?`<button class="btn btn-g btn-sm" id="btnToday" style="width:100%;marg
 <div class="card">
 <div style="margin-bottom:10px">
 <div style="font-size:14px;font-weight:700;margin-bottom:8px">${colObj?.emoji||'🐱'} Turno ${colObj?.nome||col}</div>
-${d>=tod&&!isMine&&!myIndisp?`<div style="display:flex;gap:6px;flex-wrap:wrap">
-<button class="btn btn-gr btn-sm" data-addshift="${d}" data-col="${col}" style="flex:1">✅ Sono disponibile</button>
-<button class="btn btn-o btn-sm" data-addindisp="${d}" style="flex:1">⚠️ Non posso venire</button>
+${d>=tod?`<div style="display:flex;flex-direction:column;gap:6px">
+${
+  // Caso 1: già iscritto
+  isMine
+  ? `<div style="font-size:12px;color:var(--forest);font-weight:600;background:var(--lblue);border-radius:8px;padding:8px">✅ Sei iscritto a questo turno</div>`
+  : ''
+}
+${
+  // Caso 2: iscritto E ha già segnalato indisponibilità
+  isMine&&myIndisp
+  ? `<div style="font-size:12px;color:var(--orange);font-weight:600;background:#FFF8F0;border-radius:8px;padding:8px">⚠️ Hai segnalato indisponibilità</div>`
+  : ''
+}
+${
+  // Caso 3: iscritto E non ha ancora segnalato indisponibilità → mostra "Non posso venire"
+  isMine&&!myIndisp
+  ? `<button class="btn btn-o btn-sm" data-addindisp="${d}" data-col="${col}" style="width:100%">⚠️ Non posso venire</button>`
+  : ''
+}
+${
+  // Caso 4: non iscritto, è di questa colonia, non ha segnalato indisponibilità → "Sono disponibile"
+  !isMine&&!myIndisp&&sonoInQuestaColonia
+  ? `<button class="btn btn-gr btn-sm" data-addshift="${d}" data-col="${col}" style="width:100%">✅ Sono disponibile</button>`
+  : ''
+}
+${
+  // Caso 5: non iscritto, NON è di questa colonia, non è admin → messaggio informativo
+  !isMine&&!sonoInQuestaColonia
+  ? `<div style="font-size:12px;color:var(--muted);font-style:italic;padding:4px 0">Non sei assegnato a questa colonia — solo la coordinatrice può aggiungerti</div>`
+  : ''
+}
+${
+  // Caso 6: non iscritto, ha già segnalato indisponibilità (da pagina "Io")
+  !isMine&&myIndisp
+  ? `<div style="font-size:12px;color:var(--orange);font-weight:600;background:#FFF8F0;border-radius:8px;padding:8px">⚠️ Hai segnalato indisponibilità per questo giorno</div>`
+  : ''
+}
 </div>`:''}
-${isMine?`<div style="font-size:12px;color:var(--forest);font-weight:600">✅ Sei già iscritto a questo turno</div>`:''}
-${myIndisp?`<div style="font-size:12px;color:var(--orange);font-weight:600">⚠️ Hai segnalato indisponibilità</div>`:''}
 </div>
-${turni.length===0?`<div style="color:var(--muted);font-size:13px">Nessun volontario iscritto</div>`:''}
+${turni.length===0?`<div style="color:var(--muted);font-size:13px;padding:4px 0">Nessun volontario iscritto</div>`:''}
 ${turni.map(s=>{
   const mine=s.volunteerId===S.user.id;
   const ind=indisp.find(i=>i.volunteerId===s.volunteerId);
-  return`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid #f0f0f0">
+  return`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid #f0f0f0">
     <div>
       <span style="font-size:13px;font-weight:${mine?'700':'500'};${ind?'text-decoration:line-through;color:var(--orange)':''}">${mine?'👤 ':''}${s.volunteerCognome} ${s.volunteerNome}</span>
-      ${ind?`<span style="font-size:11px;color:var(--orange);margin-left:4px">⚠️ Indisponibile${ind.motivo?' — '+ind.motivo:''}</span>`:''}
+      ${ind?`<span style="font-size:11px;color:var(--orange);display:block;margin-top:2px">⚠️ Indisponibile${ind.motivo?' — '+ind.motivo:''}</span>`:''}
     </div>
-    ${mine&&d>=tod?`<button class="btn btn-r btn-sm" data-rmsid="${s.id}">Rimuoviti</button>`:''}
-    ${isP&&!mine&&d>=tod?`<button class="btn btn-r btn-sm" data-rmsid="${s.id}">🗑</button>`:''}
+    <div style="display:flex;gap:4px;flex-shrink:0">
+      ${mine&&d>=tod&&!ind?`<button class="btn btn-r btn-sm" data-rmsid="${s.id}">Rimuoviti</button>`:''}
+      ${isP&&!mine&&d>=tod?`<button class="btn btn-r btn-sm" data-rmsid="${s.id}">🗑</button>`:''}
+    </div>
   </div>`;}).join('')}
-${isP&&d>=tod?`<div style="margin-top:10px;display:flex;gap:6px">
-<select id="addVolSel_${d}" class="inp" style="flex:1">
-  <option value="">— Aggiungi volontario —</option>
-  ${volsInColonia.filter(v=>!turni.find(s=>s.volunteerId===v.id)).map(v=>`<option value="${v.id}">${v.cognome} ${v.nome}</option>`).join('')}
+${isP&&d>=tod?`<div style="margin-top:12px;border-top:1px solid #f0f0f0;padding-top:10px">
+<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Aggiungi volontario al turno</div>
+<div style="display:flex;gap:6px">
+<select id="addVolSel_${d}" class="inp" style="flex:1;font-size:13px">
+  <option value="">— Seleziona volontario —</option>
+  ${tuttiVols.map(v=>{
+    const suaColonie=(v.coloniaIds||[]).includes(col)?` ✓`:'';
+    return`<option value="${v.id}">${v.cognome} ${v.nome}${suaColonie}</option>`;
+  }).join('')}
 </select>
-<button class="btn btn-p btn-sm" data-addvolshift="${d}" data-col="${col}" style="width:auto">+ Aggiungi</button>
+<button class="btn btn-p btn-sm" data-addvolshift="${d}" data-col="${col}" style="white-space:nowrap">+ Aggiungi</button>
+</div>
+<div style="font-size:10px;color:var(--muted);margin-top:4px">✓ = assegnato a questa colonia</div>
 </div>`:''}
 </div>
 ${indisp.length?`<div class="card">
 <div style="font-size:13px;font-weight:700;margin-bottom:8px">⚠️ Indisponibilità segnalate</div>
-${indisp.map(i=>`<div style="font-size:12px;padding:4px 0;border-bottom:1px solid #f0f0f0">
-<strong>${i.volunteerCognome} ${i.volunteerNome}</strong>${i.motivo?' — '+i.motivo:''}
-${(S.user.id===i.volunteerId||isP)?`<button class="btn btn-r btn-sm" style="float:right" data-remindisp="${i.id}">🗑</button>`:''}
+${indisp.map(i=>`<div style="font-size:12px;padding:5px 0;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between;gap:8px">
+<span><strong>${i.volunteerCognome} ${i.volunteerNome}</strong>${i.motivo?' — '+i.motivo:''}</span>
+${(S.user.id===i.volunteerId||isP)?`<button class="btn btn-r btn-sm" data-remindisp="${i.id}">🗑</button>`:''}
 </div>`).join('')}
 </div>`:''}`;};
 
