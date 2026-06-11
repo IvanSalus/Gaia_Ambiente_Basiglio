@@ -227,7 +227,7 @@ const S={
   selColonia:'solco',           // colonia attiva nel calendario
   loginCF:'',loginPin:'',loginErr:'',loginStep:1,loginRimanere:false,loading:false,
   setPinMode:false,setPinNew:'',setPinConf:'',_tmpVol:null,_newComm:false,
-  setupNome:'',setupCognome:'',setupCF:'',
+  setupNome:'',setupCognome:'',setupCF:'',setupErr:'',setupLoading:false,
   fv:{nome:'',cognome:'',cf:'',ruoli:['volunteer'],coloniaIds:[]},
   fcom:{titolo:'',testo:'',importante:false},
   fev:{titolo:'',data:today(),oraI:'09:00',oraF:'13:00',luogo:'',note:''},
@@ -355,18 +355,32 @@ const doLogin=async()=>{
 const doSetPin=async()=>{
   if(S.setPinNew.length<4){toast('PIN minimo 4 cifre','err');return;}
   if(S.setPinNew!==S.setPinConf){toast('I PIN non coincidono','err');return;}
-  await updateDoc(doc(db,'volunteers',S._tmpVol.id),{pin:S.setPinNew});
-  S._tmpVol.pin=S.setPinNew;
-  await afterLogin(S._tmpVol);
-  if(S.loginRimanere)localStorage.setItem('savedUser',S._tmpVol.id);
-  S.setPinMode=false;S.setPinNew='';S.setPinConf='';S._tmpVol=null;render();};
+  S.loading=true;render();
+  try{
+    await updateDoc(doc(db,'volunteers',S._tmpVol.id),{pin:S.setPinNew});
+    S._tmpVol.pin=S.setPinNew;
+    await afterLogin(S._tmpVol);
+    if(S.loginRimanere)localStorage.setItem('savedUser',S._tmpVol.id);
+    S.setPinMode=false;S.setPinNew='';S.setPinConf='';S._tmpVol=null;
+  }catch(e){
+    console.error('[SETPIN]',e);
+    toast('Errore: '+e.message,'err');
+  }
+  S.loading=false;render();};
 const doSetupAdmin=async()=>{
   const nome=S.setupNome.trim(),cog=S.setupCognome.trim();
-  if(!nome||!cog){toast('Inserisci nome e cognome','err');return;}
-  const v={nome,cognome:cog,codiceFiscale:S.setupCF,approved:true,ruoli:['coordinatore','volunteer'],
-    coloniaIds:[],pin:null,createdAt:serverTimestamp()};
-  const ref=await addDoc(collection(db,'volunteers'),v);
-  S._tmpVol={id:ref.id,...v};S.setPinMode=true;render();};
+  if(!nome||!cog){S.setupErr='Inserisci nome e cognome';render();return;}
+  S.setupLoading=true;S.setupErr='';render();
+  try{
+    const v={nome,cognome:cog,codiceFiscale:S.setupCF,approved:true,ruoli:['coordinatore','volunteer'],
+      coloniaIds:[],pin:null,createdAt:serverTimestamp()};
+    const ref=await addDoc(collection(db,'volunteers'),v);
+    S._tmpVol={id:ref.id,...v};S.setPinMode=true;S.setupLoading=false;render();
+  }catch(e){
+    console.error('[SETUP]',e);
+    S.setupErr='Errore connessione Firebase: '+e.message;
+    S.setupLoading=false;render();
+  }};
 const doLogout=()=>{
   localStorage.removeItem('savedUser');clearListeners();
   Object.assign(S,{user:null,screen:'login',loginCF:'',loginPin:'',loginErr:'',loginStep:1,loginRimanere:false,
@@ -687,7 +701,8 @@ const setupHTML=()=>`<div id="login-wrap"><div class="login-box">
 <div><div class="lbl">Nome</div><input id="sNome" class="inp" value="${S.setupNome}" placeholder="Nome"></div>
 <div><div class="lbl">Cognome</div><input id="sCog" class="inp" value="${S.setupCognome}" placeholder="Cognome"></div>
 </div>
-<button id="setupBtn" class="btn btn-p">Crea account Coordinatore</button>
+${S.setupErr?`<div style="color:#C62828;font-size:12px;background:#FFEBEE;border-radius:8px;padding:10px;margin-bottom:10px">⚠️ ${S.setupErr}</div>`:''}
+<button id="setupBtn" class="btn btn-p" ${S.setupLoading?'disabled':''}>${S.setupLoading?'⏳ Creazione in corso...':'Crea account Coordinatore'}</button>
 </div></div>`;
 
 // ── BACHECA ───────────────────────────────────────────────────────────────────
