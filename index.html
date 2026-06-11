@@ -73,7 +73,7 @@ button,input,select,textarea{font-family:inherit}
 .b2{background:var(--yellow);color:#333}.b3{background:var(--green);color:#fff}
 .rbadge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px}
 .r-coordinatore{background:#E8F5E9;color:#2E7D32}.r-referente_colonia{background:#E3F2FD;color:#0D47A1}
-.r-volunteer{background:#F1F8E9;color:#33691E}
+.r-programmatore{background:#EDE7F6;color:#4527A0}.r-volunteer{background:#F1F8E9;color:#33691E}
 .view-toggle{display:flex;border:1.5px solid #ddd;border-radius:8px;overflow:hidden;margin-bottom:12px}
 .vt{flex:1;padding:8px;font-size:13px;font-weight:500;border:none;background:#fff;color:var(--muted);cursor:pointer}
 .vt.on{background:var(--forest);color:#fff}
@@ -179,6 +179,7 @@ const DOWS=['Lun','Mar','Mer','Gio','Ven','Sab','Dom'];
 const SOGLIA_ALERT_GIORNI=15; // avvisa turni scoperti entro 15 giorni
 
 const RUOLI={
+  programmatore:{label:'Programmatore',cls:'r-programmatore'},
   coordinatore:{label:'Coordinatore',cls:'r-coordinatore'},
   referente_colonia:{label:'Referente Colonia',cls:'r-referente_colonia'},
   volunteer:{label:'Volontario',cls:'r-volunteer'}
@@ -209,8 +210,10 @@ const fmtTs=ts=>{if(!ts||!ts.seconds)return'';const d=new Date(ts.seconds*1000);
   return d.toLocaleDateString('it-IT',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});};
 const getRuoli=u=>{if(!u)return['volunteer'];if(Array.isArray(u.ruoli)&&u.ruoli.length)return u.ruoli;
   return['volunteer'];};
-const can=(u,...roles)=>{if(!u)return false;const ur=getRuoli(u);if(ur.includes('coordinatore'))return true;
+const can=(u,...roles)=>{if(!u)return false;const ur=getRuoli(u);
+  if(ur.includes('programmatore')||ur.includes('coordinatore'))return true;
   if(roles.includes('volunteer'))return true;return roles.some(r=>ur.includes(r));};
+const isAdmin=(u)=>u&&(getRuoli(u).includes('programmatore')||getRuoli(u).includes('coordinatore'));
 const rlLabel=u=>getRuoli(u).filter(r=>r!=='volunteer').map(r=>RUOLI[r]?.label||r).join(', ')||'Volontario';
 
 // ── STATO APPLICAZIONE ────────────────────────────────────────────────────────
@@ -225,6 +228,7 @@ const S={
   indisponibilita:[],           // {id, volunteerId, date, coloniaId, motivo, createdAt}
   // UI state
   selColonia:'solco',           // colonia attiva nel calendario
+  editVolId:null,               // volontario in modalità modifica
   loginCF:'',loginPin:'',loginErr:'',loginStep:1,loginRimanere:false,loading:false,
   setPinMode:false,setPinNew:'',setPinConf:'',_tmpVol:null,_newComm:false,
   setupNome:'',setupCognome:'',setupCF:'',setupErr:'',setupLoading:false,
@@ -411,9 +415,10 @@ const doAddIndisp=async()=>{
     createdAt:serverTimestamp()};
   await addDoc(collection(db,'indisponibilita'),rec);
   // Notifica push al coordinatore
+  const colNomeIndisp=S.colonie.find(c=>c.id===f.coloniaId)?.nome||f.coloniaId;
   sendPushNotification(
-    `⚠️ Indisponibilità segnalata`,
-    `${S.user.cognome} ${S.user.nome} non può fare il turno del ${fmtS(f.date)} a ${S.colonie.find(c=>c.id===f.coloniaId)?.nome||f.coloniaId}`,
+    `⚠️ Turno scoperto — ${colNomeIndisp}`,
+    `${S.user.cognome} ${S.user.nome} non può fare il turno del ${fmtS(f.date)} a ${colNomeIndisp}${f.motivo?' ('+f.motivo+')':''}`,
     'indisponibilita'
   );
   S.findisp={date:today(),coloniaId:S.selColonia,motivo:''};
@@ -458,7 +463,7 @@ const doAddGatto=async()=>{
   S.fcat={nome:'',sesso:'F',colore:'',sterilizzato:true,note:'',dataIngresso:today(),coloniaId:S.selColonia};
   S.addCat=false;toast('Gatto aggiunto');render();};
 const doUpdateGatto=async(id,campi)=>{await updateDoc(doc(db,'gatti',id),campi);toast('Aggiornato');render();};
-const doRemGatto=async id=>{if(!confirm('Eliminare?'))return;await deleteDoc(doc(db,'gatti',id));toast('Rimosso','warn');closeSheet();render();};
+const doRemGatto=async id=>{await deleteDoc(doc(db,'gatti',id));toast('Rimosso','warn');closeSheet();render();};
 
 // ── COMUNICAZIONI ─────────────────────────────────────────────────────────────
 const doAddComm=async()=>{const f=S.fcom;if(!f.titolo.trim()||!f.testo.trim()){toast('Titolo e testo obbligatori','err');return;}
@@ -803,10 +808,14 @@ const calGiornoHTML=()=>{
 </div>
 ${d!==tod?`<button class="btn btn-g btn-sm" id="btnToday" style="width:100%;margin-bottom:10px">Oggi</button>`:''}
 <div class="card">
-<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-<div style="font-size:14px;font-weight:700">${colObj?.emoji||'🐱'} Turno ${colObj?.nome||col}</div>
-${d>=tod&&!isMine&&!myIndisp?`<button class="btn btn-gr btn-sm" data-addshift="${d}" data-col="${col}">+ Sono disponibile</button>`:''}
-${d>=tod&&!isMine&&!myIndisp?`<button class="btn btn-o btn-sm" data-addindisp="${d}">Segnala indisponibilità</button>`:''}
+<div style="margin-bottom:10px">
+<div style="font-size:14px;font-weight:700;margin-bottom:8px">${colObj?.emoji||'🐱'} Turno ${colObj?.nome||col}</div>
+${d>=tod&&!isMine&&!myIndisp?`<div style="display:flex;gap:6px;flex-wrap:wrap">
+<button class="btn btn-gr btn-sm" data-addshift="${d}" data-col="${col}" style="flex:1">✅ Sono disponibile</button>
+<button class="btn btn-o btn-sm" data-addindisp="${d}" style="flex:1">⚠️ Non posso venire</button>
+</div>`:''}
+${isMine?`<div style="font-size:12px;color:var(--forest);font-weight:600">✅ Sei già iscritto a questo turno</div>`:''}
+${myIndisp?`<div style="font-size:12px;color:var(--orange);font-weight:600">⚠️ Hai segnalato indisponibilità</div>`:''}
 </div>
 ${turni.length===0?`<div style="color:var(--muted);font-size:13px">Nessun volontario iscritto</div>`:''}
 ${turni.map(s=>{
@@ -960,6 +969,20 @@ ${S.colonie.map(c=>`<div class="ck${(S.fv.coloniaIds||[]).includes(c.id)?' on':'
   const lista=filtrati.length===0?'<div class="empty">Nessun volontario</div>':filtrati.map(v=>{
     const colonie=(v.coloniaIds||[]).map(id=>{const c=S.colonie.find(x=>x.id===id);return c?`<span class="colonia-badge" style="margin:2px">${c.emoji} ${c.nome}</span>`:null;}).filter(Boolean).join('');
     const turniTot=S.shifts.filter(s=>s.volunteerId===v.id).length;
+    const isEdit=S.editVolId===v.id;
+    const editPanel=isEdit&&isP?`<div style="border-top:1px solid #f0f0f0;margin-top:10px;padding-top:10px">
+<div style="margin-bottom:8px"><div class="lbl">Ruoli</div><div class="ck-group">
+${Object.entries(RUOLI).filter(([k])=>k!=='volunteer').map(([k,r])=>`<div class="ck${getRuoli(v).includes(k)?' on':''}" data-evruolo="${v.id}:${k}">${r.label}</div>`).join('')}
+</div></div>
+<div style="margin-bottom:8px"><div class="lbl">Colonie</div><div class="ck-group">
+${S.colonie.map(c=>`<div class="ck${(v.coloniaIds||[]).includes(c.id)?' on':''}" data-evcol="${v.id}:${c.id}">${c.emoji} ${c.nome}</div>`).join('')}
+</div></div>
+<div style="display:flex;gap:6px;flex-wrap:wrap">
+<button class="btn btn-g btn-sm" data-togglevol="${v.id}">${v.approved?'⛔ Blocca':'✓ Abilita'}</button>
+<button class="btn btn-g btn-sm" data-resetpin="${v.id}">🔑 Reset PIN</button>
+<button class="btn btn-r btn-sm" data-remvol="${v.id}">🗑 Elimina</button>
+</div>
+</div>`:'';
     return`<div class="card" style="padding:12px">
 <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
 <div style="flex:1">
@@ -968,12 +991,9 @@ ${S.colonie.map(c=>`<div class="ck${(S.fv.coloniaIds||[]).includes(c.id)?' on':'
 <div style="margin-top:4px">${colonie||'<span style="font-size:11px;color:var(--muted)">Nessuna colonia</span>'}</div>
 ${!v.approved?`<div style="font-size:11px;color:var(--red);margin-top:4px">⛔ Account bloccato</div>`:''}
 </div>
-${isP?`<div style="display:flex;flex-direction:column;gap:5px">
-<button class="btn btn-g btn-sm" data-togglevol="${v.id}">${v.approved?'⛔ Blocca':'✓ Abilita'}</button>
-<button class="btn btn-g btn-sm" data-resetpin="${v.id}">🔑 Reset PIN</button>
-<button class="btn btn-r btn-sm" data-remvol="${v.id}">🗑</button>
-</div>`:''}
+${isP?`<button class="btn btn-g btn-sm" data-editvol="${v.id}" style="flex-shrink:0">${isEdit?'✕ Chiudi':'✏️ Modifica'}</button>`:''}
 </div>
+${editPanel}
 </div>`;}).join('');
   return `${filterTabs}${formAdd}${lista}`;};
 
@@ -996,8 +1016,9 @@ const eventiHTML=()=>{
 <div style="margin-bottom:10px"><div class="lbl">Note</div><textarea id="fevNote" class="inp" rows="2">${S.fev.note}</textarea></div>
 <div style="display:flex;gap:8px"><button id="btnSvEv" class="btn btn-p" style="flex:1">✓ Aggiungi</button><button id="btnCxEv" class="btn btn-g">Annulla</button></div>
 </div>`:'';
-  const evCard=ev=>{const mine=S.partecipazioni.find(p=>p.eventoId===ev.id&&p.volunteerId===S.user.id);
-    const partCount=S.partecipazioni.filter(p=>p.eventoId===ev.id).length;
+  const evCard=ev=>{
+    const mine=S.partecipazioni.find(p=>p.eventoId===ev.id&&p.volunteerId===S.user.id);
+    const partecs=S.partecipazioni.filter(p=>p.eventoId===ev.id);
     return`<div class="card">
 <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px">
 <div><div style="font-size:15px;font-weight:700;color:var(--forest)">${ev.titolo}</div>
@@ -1005,13 +1026,23 @@ const eventiHTML=()=>{
 ${isP?`<button class="btn btn-r btn-sm" data-remev="${ev.id}">🗑</button>`:''}
 </div>
 ${ev.note?`<div style="font-size:13px;color:#555;margin-bottom:8px">${ev.note}</div>`:''}
-<div style="font-size:12px;color:var(--muted);margin-bottom:8px">👥 ${partCount} iscritti</div>
-${mine?`<button class="btn btn-r btn-sm" data-leave="${mine.id}">Rimuoviti</button>`:`
-${ev.data>=tod?`<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px">
-<input type="time" id="dalle_${ev.id}" value="" class="inp" style="width:90px;font-size:13px">
-<input type="time" id="alle_${ev.id}" value="" class="inp" style="width:90px;font-size:13px">
-<button class="btn btn-gr btn-sm" data-join="${ev.id}">✓ Partecipo</button>
-</div>`:'<div style="font-size:12px;color:var(--muted)">Evento concluso</div>'}`}
+${partecs.length?`<div style="margin-bottom:10px">
+<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px">👥 Partecipanti (${partecs.length})</div>
+${partecs.map(p=>`<div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid #f5f5f5">
+<span>${p.volunteerCognome} ${p.volunteerNome}${p.fasciaOraria?' — <strong>'+p.fasciaOraria+'</strong>':''}</span>
+${(p.volunteerId===S.user.id||isP)?`<button class="btn btn-r btn-sm" style="padding:2px 7px;font-size:11px" data-leave="${p.id}">✕</button>`:''}
+</div>`).join('')}
+</div>`:'<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Nessun partecipante ancora</div>'}
+${!mine?`${ev.data>=tod?`<div style="border-top:1px solid #f0f0f0;padding-top:10px">
+<div style="font-size:12px;font-weight:600;margin-bottom:6px">Scegli la tua fascia oraria (opzionale):</div>
+<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+<label style="font-size:12px;color:var(--muted)">Dalle</label>
+<input type="time" id="dalle_${ev.id}" class="inp" style="width:100px;font-size:13px">
+<label style="font-size:12px;color:var(--muted)">Alle</label>
+<input type="time" id="alle_${ev.id}" class="inp" style="width:100px;font-size:13px">
+<button class="btn btn-gr btn-sm" data-join="${ev.id}" style="flex:1">✅ Partecipo</button>
+</div>
+</div>`:'<div style="font-size:12px;color:var(--muted);font-style:italic">Evento concluso</div>'}`:''}
 </div>`;};
   return `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
 <div class="sec-title" style="margin:0">🎪 Eventi</div>
@@ -1192,6 +1223,21 @@ const bindPage=()=>{
     else S.fv.coloniaIds=[...(S.fv.coloniaIds||[]),id];
     e.currentTarget.classList.toggle('on');render();}));
   document.getElementById('btnAddVol')?.addEventListener('click',doAddVol);
+  document.querySelectorAll('[data-editvol]').forEach(b=>b.addEventListener('click',e=>{
+    const id=e.currentTarget.dataset.editvol;
+    S.editVolId=S.editVolId===id?null:id;render();}));
+  document.querySelectorAll('[data-evruolo]').forEach(b=>b.addEventListener('click',e=>{
+    const [id,ruolo]=e.currentTarget.dataset.evruolo.split(':');
+    const v=S.vols.find(x=>x.id===id);if(!v)return;
+    let ruoli=getRuoli(v);
+    if(ruoli.includes(ruolo))ruoli=ruoli.filter(r=>r!==ruolo);else ruoli=[...ruoli,ruolo];
+    doUpdateRuoli(id,ruoli);e.currentTarget.classList.toggle('on');}));
+  document.querySelectorAll('[data-evcol]').forEach(b=>b.addEventListener('click',e=>{
+    const [id,colId]=e.currentTarget.dataset.evcol.split(':');
+    const v=S.vols.find(x=>x.id===id);if(!v)return;
+    let cols=[...(v.coloniaIds||[])];
+    if(cols.includes(colId))cols=cols.filter(c=>c!==colId);else cols=[...cols,colId];
+    doUpdateColonie(id,cols);e.currentTarget.classList.toggle('on');}));
   document.querySelectorAll('[data-togglevol]').forEach(b=>b.addEventListener('click',e=>doToggleApproved(e.currentTarget.dataset.togglevol)));
   document.querySelectorAll('[data-resetpin]').forEach(b=>b.addEventListener('click',e=>doResetPin(e.currentTarget.dataset.resetpin)));
   document.querySelectorAll('[data-remvol]').forEach(b=>b.addEventListener('click',e=>{if(confirm('Eliminare?'))doRemVol(e.currentTarget.dataset.remvol);}));
