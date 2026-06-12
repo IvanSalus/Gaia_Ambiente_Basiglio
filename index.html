@@ -1146,6 +1146,40 @@ ${i.motivo?`<div style="font-size:12px;color:var(--muted)">${i.motivo}</div>`:''
 <button class="btn btn-r btn-sm" data-remindisp="${i.id}">🗑</button>
 </div></div>`;}).join('')}</div>`:''}`;};
 
+const renderListaPunti=(tuttePunti,colCorrente,isP)=>{
+  if(!tuttePunti||tuttePunti.length===0)
+    return '<div class="empty" style="padding:1rem">Nessun punto inserito</div>';
+  const colonieConPunti=[...new Set(tuttePunti.map(p=>p.coloniaId))]
+    .sort((a,b)=>a===colCorrente.id?-1:b===colCorrente.id?1:0);
+  return colonieConPunti.map(colId=>{
+    const colObj=S.colonie.find(c=>c.id===colId)||{emoji:'\u{1F431}',nome:colId};
+    const pts=tuttePunti.filter(p=>p.coloniaId===colId);
+    const ptsHtml=pts.map(p=>{
+      const lat=typeof p.lat==='number'?p.lat.toFixed(4):p.lat;
+      const lng=typeof p.lng==='number'?p.lng.toFixed(4):p.lng;
+      const infoPreview=p.info
+        ?'<div style="font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px">\u2139\uFE0F '+p.info+'</div>'
+        :'';
+      const addrHtml=p.indirizzo?'<div class="map-punto-addr">'+p.indirizzo+'</div>':'';
+      const btnLabel=isP?'\u270F\uFE0F Info':'\u2139\uFE0F Info';
+      return '<div class="map-punto" style="cursor:pointer" data-puntoid="'+p.id+'">'
+        +'<div class="map-punto-icon">\u{1F4CD}</div>'
+        +'<div class="map-punto-info">'
+        +'<div class="map-punto-label">'+p.label+'</div>'
+        +addrHtml+infoPreview
+        +'<div style="font-size:10px;color:#ccc;margin-top:2px">'+lat+', '+lng+'</div>'
+        +'</div>'
+        +'<button class="btn btn-g btn-sm" style="flex-shrink:0;font-size:11px" data-puntoid="'+p.id+'">'+btnLabel+'</button>'
+        +'</div>';
+    }).join('');
+    return '<div style="margin-bottom:14px">'
+      +'<div style="font-size:12px;font-weight:700;color:var(--forest);text-transform:uppercase;'
+      +'letter-spacing:.05em;padding:6px 0;border-bottom:2px solid var(--border);margin-bottom:8px">'
+      +colObj.emoji+' '+colObj.nome+' ('+pts.length+')'
+      +'</div>'+ptsHtml+'</div>';
+  }).join('');
+};
+
 // ── COLONIE ───────────────────────────────────────────────────────────────────
 const colonieHTML=()=>{
   const isP=can(S.user,'coordinatore');
@@ -1229,39 +1263,7 @@ ${S.fPunto.mode==='addr'
   <div class="map-overlay-hint" id="mapHint" style="display:none">Tocca la mappa per posizionare il punto</div>`:''}
 </div>
 ${formPunto}
-${(() => {
-  // raggruppa TUTTI i punti per colonia e mostra prima la colonia corrente
-  const tuttePunti=S.punti;
-  if(tuttePunti.length===0)return '<div class="empty" style="padding:1rem">Nessun punto inserito</div>';
-  // ordine: colonia corrente prima, poi le altre
-  const colonieConPunti=[...new Set(tuttePunti.map(p=>p.coloniaId))].sort((a,b)=>a===col.id?-1:b===col.id?1:0);
-  return colonieConPunti.map(colId=>{
-    const colObj=S.colonie.find(c=>c.id===colId)||{emoji:'🐱',nome:colId};
-    const pts=tuttePunti.filter(p=>p.coloniaId===colId);
-    return \`<div style="margin-bottom:14px">
-<div style="font-size:12px;font-weight:700;color:var(--forest);text-transform:uppercase;
-  letter-spacing:.05em;padding:6px 0;border-bottom:2px solid var(--border);margin-bottom:8px">
-  \${colObj.emoji} \${colObj.nome} (\${pts.length})
-</div>
-\${pts.map(p=>{
-  const lat=typeof p.lat==='number'?p.lat.toFixed(4):p.lat;
-  const lng=typeof p.lng==='number'?p.lng.toFixed(4):p.lng;
-  return\`<div class="map-punto" style="cursor:pointer" data-puntoid="\${p.id}">
-<div class="map-punto-icon">📍</div>
-<div class="map-punto-info">
-<div class="map-punto-label">\${p.label}</div>
-\${p.indirizzo?\`<div class="map-punto-addr">\${p.indirizzo}</div>\`:''}
-\${p.info?\`<div style="font-size:11px;color:var(--muted);margin-top:2px;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px">ℹ️ \${p.info}</div>\`:''}
-<div style="font-size:10px;color:#ccc;margin-top:2px">\${lat}, \${lng}</div>
-</div>
-<button class="btn btn-g btn-sm" style="flex-shrink:0;font-size:11px" data-puntoid="\${p.id}">
-  \${isP?'✏️ Info':'ℹ️ Info'}
-</button>
-</div>\`;}).join('')}
-</div>\`;
-  }).join('');
-})()}`;
+${renderListaPunti(S.punti,col,isP)}`;
   }
   return `${colSel}<div class="card" style="border-left:4px solid var(--forest)">
 <div style="font-size:16px;font-weight:700;color:var(--forest)">${col.emoji} Colonia ${col.nome}</div>
