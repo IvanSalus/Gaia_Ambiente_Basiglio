@@ -259,7 +259,7 @@ const S={
   findisp:{date:today(),coloniaId:'solco',motivo:''},
   addCom:false,addEv:false,addCh:false,addCat:false,addColonia:false,addIndisp:false,
   fNewColonia:{nome:'',emoji:'🐱'},
-  fPunto:{label:'',indirizzo:'',lat:'',lng:'',mode:'addr'}, // form nuovo punto colonia
+  fPunto:{label:'',indirizzo:'',lat:'',lng:'',mode:'addr',info:''}, // form nuovo punto colonia
   addPunto:false,
   coloniaTab:'gatti',   // tab dentro pagina colonie
   coloniaTabMap:false,   // true = tab mappa attiva
@@ -496,10 +496,11 @@ const doAddPunto=async()=>{
   }
   const p={coloniaId:S.selColonia,label:f.label.trim(),
     indirizzo:f.indirizzo.trim(),lat:f.lat,lng:f.lng,
+    info:f.info.trim(),
     createdById:S.user.id,createdAt:serverTimestamp()};
   const ref=await addDoc(collection(db,'punti_colonia'),p);
   S.punti.push({id:ref.id,...p});
-  S.fPunto={label:'',indirizzo:'',lat:'',lng:'',mode:'addr'};
+  S.fPunto={label:'',indirizzo:'',lat:'',lng:'',mode:'addr',info:''};
   S.addPunto=false;
   toast('Punto aggiunto');
   render();
@@ -508,10 +509,12 @@ const doAddPunto=async()=>{
 const doAddPuntoFromMap=async(lat,lng)=>{
   // mostra mini-sheet per inserire il nome
   const sheetHtml=`
-    <div style="font-size:15px;font-weight:700;color:var(--forest);margin-bottom:12px">📍 Nuovo punto sulla mappa</div>
-    <div style="font-size:12px;color:var(--muted);margin-bottom:10px">🌐 ${lat}, ${lng}</div>
-    <div class="lbl">Nome / descrizione</div>
-    <input id="quickPuntoLabel" class="inp" placeholder='Es. Zona mangiatoie nord' style="margin-bottom:12px">
+    <div style="font-size:15px;font-weight:700;color:var(--forest);margin-bottom:4px">📍 Nuovo punto sulla mappa</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px">🌐 ${lat}, ${lng}</div>
+    <div class="lbl">Nome / descrizione *</div>
+    <input id="quickPuntoLabel" class="inp" placeholder='Es. Zona mangiatoie nord' style="margin-bottom:10px">
+    <div class="lbl">Info (orari, accesso, note operative)</div>
+    <textarea id="quickPuntoInfo" class="inp" rows="3" placeholder="Es. Mangiatoie visitate ogni mattina alle 8. Accesso dal cancello laterale..." style="resize:vertical;margin-bottom:12px"></textarea>
     <div style="display:flex;gap:8px">
       <button id="btnSvQuickPunto" class="btn btn-p" style="flex:1">✓ Aggiungi</button>
       <button onclick="closeSheet();setMapAddMode(true)" class="btn btn-g">Annulla</button>
@@ -521,8 +524,9 @@ const doAddPuntoFromMap=async(lat,lng)=>{
     if(inp)inp.focus();
     document.getElementById('btnSvQuickPunto')?.addEventListener('click',async()=>{
       const label=document.getElementById('quickPuntoLabel')?.value?.trim();
+      const info=document.getElementById('quickPuntoInfo')?.value?.trim()||'';
       if(!label){toast('Inserisci un nome','err');return;}
-      const p={coloniaId:S.selColonia,label,indirizzo:'',lat,lng,
+      const p={coloniaId:S.selColonia,label,indirizzo:'',lat,lng,info,
         createdById:S.user.id,createdAt:serverTimestamp()};
       const ref=await addDoc(collection(db,'punti_colonia'),p);
       S.punti.push({id:ref.id,...p});
@@ -536,7 +540,42 @@ const doAddPuntoFromMap=async(lat,lng)=>{
 const doRemPunto=async id=>{
   await deleteDoc(doc(db,'punti_colonia',id));
   S.punti=S.punti.filter(p=>p.id!==id);
-  toast('Punto rimosso','warn');render();setTimeout(()=>initMap(),100);};
+  toast('Punto rimosso','warn');closeSheet();render();setTimeout(()=>initMap(),120);};
+
+const openPuntoDetail=(id)=>{
+  const p=S.punti.find(x=>x.id===id);if(!p)return;
+  const isP=can(S.user,'coordinatore');
+  const lat=typeof p.lat==='number'?p.lat.toFixed(5):p.lat;
+  const lng=typeof p.lng==='number'?p.lng.toFixed(5):p.lng;
+  const col=S.colonie.find(c=>c.id===p.coloniaId);
+  const infoHtml=isP
+    ?'<div class="lbl">Info operative</div>'+
+      '<textarea id="editPuntoInfo" class="inp" rows="5" placeholder="Orari, accesso, note per i volontari..." style="resize:vertical;margin-bottom:10px">'+(p.info||'')+'</textarea>'+
+      '<div style="display:flex;gap:8px;margin-bottom:10px"><button id="btnSvPuntoInfo" class="btn btn-p" style="flex:1">💾 Salva info</button></div>'+
+      '<button onclick="if(confirm(\'Rimuovere questo punto?\'))doRemPunto(\''+p.id+'\')" class="btn btn-r" style="width:100%">🗑 Rimuovi punto</button>'
+    :'<div class="card" style="padding:10px"><div class="lbl">Info operative</div>'+
+      (p.info?'<div style="font-size:13px;line-height:1.6;white-space:pre-wrap">'+p.info+'</div>':'<div style="font-size:13px;color:var(--muted);font-style:italic">Nessuna info inserita</div>')+
+      '</div>';
+  openSheet(
+    '<div style="font-size:16px;font-weight:700;color:var(--forest);margin-bottom:4px">📍 '+p.label+'</div>'+
+    '<div style="font-size:12px;color:var(--muted);margin-bottom:14px">'+(col?col.emoji+' '+col.nome:p.coloniaId)+'</div>'+
+    (p.indirizzo?'<div class="card" style="padding:10px;margin-bottom:8px"><div class="lbl">Indirizzo</div><div style="font-size:13px">'+p.indirizzo+'</div></div>':'')+
+    '<div class="card" style="padding:10px;margin-bottom:12px">'+
+      '<div class="lbl">Coordinate GPS</div>'+
+      '<div style="font-size:13px;font-family:monospace">'+lat+', '+lng+'</div>'+
+      '<a href="https://maps.google.com/?q='+lat+','+lng+'" target="_blank" style="font-size:12px;color:var(--forest);display:inline-block;margin-top:5px;text-decoration:none">🗺️ Apri in Google Maps →</a>'+
+    '</div>'+infoHtml,
+    ()=>{
+      document.getElementById('btnSvPuntoInfo')?.addEventListener('click',async()=>{
+        const info=document.getElementById('editPuntoInfo')?.value?.trim()||'';
+        await updateDoc(doc(db,'punti_colonia',id),{info});
+        const idx=S.punti.findIndex(x=>x.id===id);
+        if(idx>=0)S.punti[idx].info=info;
+        toast('Info salvate');closeSheet();render();setTimeout(()=>initMap(),120);
+      });
+    }
+  );
+};
 
 // ── GATTI ─────────────────────────────────────────────────────────────────────
 const doAddGatto=async()=>{
@@ -649,13 +688,19 @@ const initMap=()=>{
     const mk=L.marker([lat,lng],{icon:mkIcon(p.label)}).addTo(_map);
     const coords=`${lat.toFixed(5)}, ${lng.toFixed(5)}`;
     const popupHtml=`
-      <div style="font-family:-apple-system,sans-serif;min-width:160px">
+      <div style="font-family:-apple-system,sans-serif;min-width:180px;max-width:240px">
         <div style="font-size:14px;font-weight:700;color:#2D5016;margin-bottom:4px">📍 ${p.label}</div>
         ${p.indirizzo?`<div style="font-size:12px;color:#555;margin-bottom:5px">🏠 ${p.indirizzo}</div>`:''}
-        <div style="font-size:11px;color:#999;margin-bottom:${isP?8:0}px">🌐 ${coords}</div>
-        ${isP?`<button onclick="event.stopPropagation();doRemPunto('${p.id}')"
+        ${p.info?`<div style="font-size:12px;color:#444;margin-bottom:6px;line-height:1.5;
+          border-left:3px solid #5a8f2a;padding-left:7px;white-space:pre-wrap">ℹ️ ${p.info.length>120?p.info.substring(0,120)+'…':p.info}</div>`:''}
+        <div style="font-size:11px;color:#999;margin-bottom:8px">🌐 ${coords}</div>
+        <button onclick="event.stopPropagation();openPuntoDetail('${p.id}')"
+          style="background:#2D5016;color:#fff;border:none;border-radius:6px;
+          padding:5px 12px;font-size:12px;cursor:pointer;width:100%;margin-bottom:${isP?6:0}px">
+          ${isP?'✏️ Dettaglio / Modifica':'ℹ️ Dettaglio'}</button>
+        ${isP?`<button onclick="event.stopPropagation();if(confirm('Rimuovere?'))doRemPunto('${p.id}')"
           style="background:#D32F2F;color:#fff;border:none;border-radius:6px;
-          padding:5px 12px;font-size:12px;cursor:pointer;width:100%">🗑 Rimuovi punto</button>`:''}
+          padding:5px 12px;font-size:12px;cursor:pointer;width:100%">🗑 Rimuovi</button>`:''}
       </div>`;
     mk.bindPopup(popupHtml,{maxWidth:240,closeButton:true});
     // stopPropagation: click sul marker NON attiva il listener della mappa
@@ -1170,6 +1215,10 @@ ${S.fPunto.mode==='addr'
 <div><div class="lbl">Latitudine</div><input id="fpLat" class="inp" value="${S.fPunto.lat}" placeholder="Es. 45.3561" inputmode="decimal"></div>
 <div><div class="lbl">Longitudine</div><input id="fpLng" class="inp" value="${S.fPunto.lng}" placeholder="Es. 9.1172" inputmode="decimal"></div>
 </div>`}
+<div style="margin-bottom:10px"><div class="lbl">Info operative (opzionale)</div>
+<textarea id="fpInfo" class="inp" rows="3"
+  placeholder="Es. Orari visita, accesso, note per i volontari..."
+  style="resize:vertical">${S.fPunto.info||''}</textarea></div>
 <div style="display:flex;gap:8px;margin-top:10px">
 <button id="btnSvPunto" class="btn btn-p" style="flex:1">✓ Aggiungi punto</button>
 <button id="btnCxPunto" class="btn btn-g">Annulla</button>
@@ -1180,16 +1229,39 @@ ${S.fPunto.mode==='addr'
   <div class="map-overlay-hint" id="mapHint" style="display:none">Tocca la mappa per posizionare il punto</div>`:''}
 </div>
 ${formPunto}
-${puntiCol.length===0?'<div class="empty" style="padding:1rem">Nessun punto inserito per questa colonia</div>':
-puntiCol.map(p=>`<div class="map-punto">
+${(() => {
+  // raggruppa TUTTI i punti per colonia e mostra prima la colonia corrente
+  const tuttePunti=S.punti;
+  if(tuttePunti.length===0)return '<div class="empty" style="padding:1rem">Nessun punto inserito</div>';
+  // ordine: colonia corrente prima, poi le altre
+  const colonieConPunti=[...new Set(tuttePunti.map(p=>p.coloniaId))].sort((a,b)=>a===col.id?-1:b===col.id?1:0);
+  return colonieConPunti.map(colId=>{
+    const colObj=S.colonie.find(c=>c.id===colId)||{emoji:'🐱',nome:colId};
+    const pts=tuttePunti.filter(p=>p.coloniaId===colId);
+    return \`<div style="margin-bottom:14px">
+<div style="font-size:12px;font-weight:700;color:var(--forest);text-transform:uppercase;
+  letter-spacing:.05em;padding:6px 0;border-bottom:2px solid var(--border);margin-bottom:8px">
+  \${colObj.emoji} \${colObj.nome} (\${pts.length})
+</div>
+\${pts.map(p=>{
+  const lat=typeof p.lat==='number'?p.lat.toFixed(4):p.lat;
+  const lng=typeof p.lng==='number'?p.lng.toFixed(4):p.lng;
+  return\`<div class="map-punto" style="cursor:pointer" data-puntoid="\${p.id}">
 <div class="map-punto-icon">📍</div>
 <div class="map-punto-info">
-<div class="map-punto-label">${p.label}</div>
-${p.indirizzo?`<div class="map-punto-addr">${p.indirizzo}</div>`:''}
-<div style="font-size:10px;color:#bbb;margin-top:1px">${typeof p.lat==='number'?p.lat.toFixed(5):p.lat}, ${typeof p.lng==='number'?p.lng.toFixed(5):p.lng}</div>
+<div class="map-punto-label">\${p.label}</div>
+\${p.indirizzo?\`<div class="map-punto-addr">\${p.indirizzo}</div>\`:''}
+\${p.info?\`<div style="font-size:11px;color:var(--muted);margin-top:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px">ℹ️ \${p.info}</div>\`:''}
+<div style="font-size:10px;color:#ccc;margin-top:2px">\${lat}, \${lng}</div>
 </div>
-${isP?`<button class="btn btn-r btn-sm" data-rmpunto="${p.id}">🗑</button>`:''}
-</div>`).join('')}`;
+<button class="btn btn-g btn-sm" style="flex-shrink:0;font-size:11px" data-puntoid="\${p.id}">
+  \${isP?'✏️ Info':'ℹ️ Info'}
+</button>
+</div>\`;}).join('')}
+</div>\`;
+  }).join('');
+})()}`;
   }
   return `${colSel}<div class="card" style="border-left:4px solid var(--forest)">
 <div style="font-size:16px;font-weight:700;color:var(--forest)">${col.emoji} Colonia ${col.nome}</div>
@@ -1521,6 +1593,9 @@ const bindPage=()=>{
   document.getElementById('modeCoords')?.addEventListener('click',()=>{S.fPunto.mode='coords';render();setTimeout(()=>initMap(),120);});
   document.getElementById('btnSvPunto')?.addEventListener('click',doAddPunto);
   document.querySelectorAll('[data-rmpunto]').forEach(b=>b.addEventListener('click',e=>doRemPunto(e.currentTarget.dataset.rmpunto)));
+  document.querySelectorAll('[data-puntoid]').forEach(b=>b.addEventListener('click',e=>{
+    e.stopPropagation();openPuntoDetail(e.currentTarget.dataset.puntoid);}));
+  document.getElementById('fpInfo')?.addEventListener('input',e=>S.fPunto.info=e.target.value);
   // reinizializza mappa se tab mappa già attiva dopo render
   if(S.coloniaTab==='mappa')setTimeout(()=>initMap(),120);
   document.querySelectorAll('[data-catdetail]').forEach(b=>b.addEventListener('click',e=>{
@@ -1584,6 +1659,7 @@ window.doRemGatto=doRemGatto;
 window.doRemPunto=doRemPunto;
 window.setMapAddMode=setMapAddMode;
 window.closeSheet=closeSheet;
+window.openPuntoDetail=openPuntoDetail;
 
 // ── PWA ───────────────────────────────────────────────────────────────────────
 window._canInstall=false;
