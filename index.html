@@ -13,6 +13,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Gaia Animali & Ambiente – Colonie Basiglio</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -145,6 +147,13 @@ button,input,select,textarea{font-family:inherit}
 .alert-title{font-size:14px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:6px}
 .alert-item{font-size:12px;padding:5px 0;border-bottom:1px solid rgba(0,0,0,.07);display:flex;justify-content:space-between;align-items:center;gap:6px}
 .alert-item:last-child{border-bottom:none}
+/* MAPPA */
+#colonia-map{height:260px;border-radius:12px;border:1.5px solid var(--border);margin-bottom:10px;z-index:1}
+.map-punto{background:#fff;border:2px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.map-punto-icon{font-size:18px;flex-shrink:0}
+.map-punto-info{flex:1;min-width:0}
+.map-punto-label{font-size:13px;font-weight:600;color:var(--forest)}
+.map-punto-addr{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* COLONIA BADGE */
 .colonia-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700;background:var(--lblue);color:var(--forest);border:1px solid var(--border)}
 </style>
@@ -225,6 +234,7 @@ const S={
   vols:[],shifts:[],eventi:[],partecipazioni:[],chest:[],comms:[],
   colonie:[...COLONIE_DEFAULT], // colonie estese dall'admin
   gatti:[],                     // {id, coloniaId, nome, sesso, colore, sterilizzato, note, dataIngresso}
+  punti:[],                    // {id, coloniaId, label, indirizzo, lat, lng}
   indisponibilita:[],           // {id, volunteerId, date, coloniaId, motivo, createdAt}
   // UI state
   selColonia:'solco',           // colonia attiva nel calendario
@@ -240,7 +250,10 @@ const S={
   findisp:{date:today(),coloniaId:'solco',motivo:''},
   addCom:false,addEv:false,addCh:false,addCat:false,addColonia:false,addIndisp:false,
   fNewColonia:{nome:'',emoji:'🐱'},
+  fPunto:{label:'',indirizzo:'',lat:'',lng:'',mode:'addr'}, // form nuovo punto colonia
+  addPunto:false,
   coloniaTab:'gatti',   // tab dentro pagina colonie
+  coloniaTabMap:false,   // true = tab mappa attiva
   catDetail:null,       // gatto selezionato per dettaglio
   volDetail:null,       // volontario selezionato
   volColoniaFilter:'tutte',
@@ -303,6 +316,7 @@ const loadAll=async()=>{
     colLoad('partecipazioni','partecipazioni'),
     colLoad('comunicazioni','comms'),
     colLoad('gatti','gatti'),
+    colLoad('punti_colonia','punti'),
     colLoad('indisponibilita','indisponibilita'),
     loadYear()
   ]);
@@ -451,6 +465,51 @@ const doResetPin=async id=>{await updateDoc(doc(db,'volunteers',id),{pin:null});
   const v=S.vols.find(x=>x.id===id);if(v)v.pin=null;toast('PIN resettato');render();};
 const doRemVol=async id=>{await deleteDoc(doc(db,'volunteers',id));S.vols=S.vols.filter(v=>v.id!==id);render();};
 
+// ── PUNTI COLONIA (mappa) ────────────────────────────────────────────────────
+const doAddPunto=async()=>{
+  const f=S.fPunto;
+  if(!f.label.trim()){toast('Inserisci un nome per il punto','err');return;}
+  if(f.mode==='addr'){
+    // geocoding con Nominatim (gratuito, no API key)
+    if(!f.indirizzo.trim()){toast('Inserisci un indirizzo','err');return;}
+    toast('Ricerca indirizzo...');
+    try{
+      const res=await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(f.indirizzo)}&limit=1`,
+        {headers:{'Accept-Language':'it'}});
+      const data=await res.json();
+      if(!data.length){toast('Indirizzo non trovato — prova coordinate manuali','err');return;}
+      f.lat=parseFloat(data[0].lat);f.lng=parseFloat(data[0].lon);
+    }catch(e){toast('Errore geocoding','err');return;}
+  }else{
+    if(!f.lat||!f.lng){toast('Inserisci latitudine e longitudine','err');return;}
+    f.lat=parseFloat(f.lat);f.lng=parseFloat(f.lng);
+    if(isNaN(f.lat)||isNaN(f.lng)){toast('Coordinate non valide','err');return;}
+  }
+  const p={coloniaId:S.selColonia,label:f.label.trim(),
+    indirizzo:f.indirizzo.trim(),lat:f.lat,lng:f.lng,
+    createdById:S.user.id,createdAt:serverTimestamp()};
+  const ref=await addDoc(collection(db,'punti_colonia'),p);
+  S.punti.push({id:ref.id,...p});
+  S.fPunto={label:'',indirizzo:'',lat:'',lng:'',mode:'addr'};
+  S.addPunto=false;
+  toast('Punto aggiunto');
+  render();
+  setTimeout(()=>initMap(),100);};
+
+const doAddPuntoFromMap=async(lat,lng)=>{
+  const label=prompt('Nome del punto (es. "Zona mangiatoie nord"):');
+  if(!label)return;
+  const p={coloniaId:S.selColonia,label:label.trim(),indirizzo:'',lat,lng,
+    createdById:S.user.id,createdAt:serverTimestamp()};
+  const ref=await addDoc(collection(db,'punti_colonia'),p);
+  S.punti.push({id:ref.id,...p});
+  toast('Punto aggiunto');render();setTimeout(()=>initMap(),100);};
+
+const doRemPunto=async id=>{
+  await deleteDoc(doc(db,'punti_colonia',id));
+  S.punti=S.punti.filter(p=>p.id!==id);
+  toast('Punto rimosso','warn');render();setTimeout(()=>initMap(),100);};
+
 // ── GATTI ─────────────────────────────────────────────────────────────────────
 const doAddGatto=async()=>{
   const f=S.fcat;
@@ -509,6 +568,49 @@ const doAddColonia=async()=>{
   const col={id,nome,emoji,createdAt:serverTimestamp()};
   await addDoc(collection(db,'colonie'),{...col});
   S.colonie.push(col);S.fNewColonia={nome:'',emoji:'🐱'};S.addColonia=false;toast('Colonia aggiunta');render();};
+
+// ── MAPPA LEAFLET ────────────────────────────────────────────────────────────
+let _map=null;
+const initMap=()=>{
+  const el=document.getElementById('colonia-map');
+  if(!el)return;
+  const puntiCol=S.punti.filter(p=>p.coloniaId===S.selColonia);
+  const isP=can(S.user,'coordinatore');
+  // distruggi mappa precedente se esiste
+  if(_map){_map.remove();_map=null;}
+  // centro default Basiglio
+  let center=[45.356,9.117],zoom=15;
+  if(puntiCol.length){
+    center=[puntiCol[0].lat,puntiCol[0].lng];
+    zoom=puntiCol.length>1?14:16;
+  }
+  _map=L.map('colonia-map',{zoomControl:true}).setView(center,zoom);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© OpenStreetMap',maxZoom:19}).addTo(_map);
+  // marker personalizzato verde
+  const mkIcon=L.divIcon({className:'',html:`<div style="background:var(--forest);border:3px solid #fff;border-radius:50%;width:18px;height:18px;box-shadow:0 2px 6px rgba(0,0,0,.35)"></div>`,iconSize:[18,18],iconAnchor:[9,9]});
+  puntiCol.forEach(p=>{
+    const mk=L.marker([p.lat,p.lng],{icon:mkIcon}).addTo(_map);
+    const popupHtml=`<div style="font-size:13px;font-weight:700;color:#2D5016;margin-bottom:4px">${p.label}</div>
+      ${p.indirizzo?`<div style="font-size:12px;color:#666;margin-bottom:6px">${p.indirizzo}</div>`:''}
+      <div style="font-size:11px;color:#999">${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</div>
+      ${isP?`<button onclick="doRemPunto('${p.id}')" style="margin-top:8px;background:#D32F2F;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer">🗑 Rimuovi</button>`:''}`;
+    mk.bindPopup(popupHtml,{maxWidth:220});
+  });
+  // click su mappa per aggiungere punto (solo admin)
+  if(isP){
+    _map.on('click',e=>{
+      const{lat,lng}=e.latlng;
+      doAddPuntoFromMap(lat.toFixed(6),lng.toFixed(6));
+    });
+    // cursore pointer per indicare che è cliccabile
+    el.style.cursor='crosshair';
+  }
+  // fit bounds se più punti
+  if(puntiCol.length>1){
+    _map.fitBounds(puntiCol.map(p=>[p.lat,p.lng]),{padding:[20,20]});
+  }
+};
 
 // ── ALERT TURNI SCOPERTI ──────────────────────────────────────────────────────
 const getTurniScoperti=()=>{
@@ -947,6 +1049,7 @@ const colonieHTML=()=>{
   const tabs=`<div class="tab-row">
 <button class="tab${S.coloniaTab==='gatti'?' on':''}" data-coltab="gatti">🐱 Gatti (${gattiCol.length})</button>
 <button class="tab${S.coloniaTab==='volontari'?' on':''}" data-coltab="volontari">👥 Volontari (${volsCol.length})</button>
+<button class="tab${S.coloniaTab==='mappa'?' on':''}" data-coltab="mappa">🗺️ Mappa</button>
 </div>`;
   let content='';
   if(S.coloniaTab==='gatti'){
@@ -972,7 +1075,7 @@ const colonieHTML=()=>{
 ${g.sterilizzato?`<div style="font-size:9px;color:#388E3C;margin-top:2px">✓ sterilizzato</div>`:''}
 </div>`).join('')}</div>`;
     content=`${isP&&!S.addCat?`<div style="text-align:right;margin-bottom:10px"><button class="btn btn-p btn-sm" id="btnNwCat">+ Aggiungi gatto</button></div>`:''}${formCat}${lista}`;
-  }else{
+  }else if(S.coloniaTab==='volontari'){
     content=volsCol.length===0?'<div class="empty">Nessun volontario assegnato a questa colonia</div>':
     volsCol.map(v=>`<div class="card" style="padding:10px;display:flex;align-items:center;justify-content:space-between">
 <div>
@@ -981,6 +1084,44 @@ ${g.sterilizzato?`<div style="font-size:9px;color:#388E3C;margin-top:2px">✓ st
 </div>
 <span class="colonia-badge">${col.emoji} ${col.nome}</span>
 </div>`).join('');
+  }else{
+    // TAB MAPPA
+    const puntiCol=S.punti.filter(p=>p.coloniaId===col.id);
+    const formPunto=isP&&S.addPunto?`<div class="card" style="border:1.5px solid var(--border);margin-bottom:10px">
+<div style="font-size:13px;font-weight:700;margin-bottom:10px">📍 Nuovo punto</div>
+<div style="margin-bottom:8px"><div class="lbl">Nome / descrizione</div>
+<input id="fpLabel" class="inp" value="${S.fPunto.label}" placeholder="Es. Zona mangiatoie nord"></div>
+<div style="margin-bottom:8px"><div class="lbl">Modalità inserimento</div>
+<div class="view-toggle" style="margin-bottom:8px">
+<button class="vt${S.fPunto.mode==='addr'?' on':''}" id="modeAddr">📮 Indirizzo</button>
+<button class="vt${S.fPunto.mode==='coords'?' on':''}" id="modeCoords">🎯 Coordinate</button>
+</div></div>
+${S.fPunto.mode==='addr'
+  ?`<div><div class="lbl">Indirizzo</div><input id="fpAddr" class="inp" value="${S.fPunto.indirizzo}" placeholder="Es. Via Roma 1, Basiglio"></div>`
+  :`<div class="g2">
+<div><div class="lbl">Latitudine</div><input id="fpLat" class="inp" value="${S.fPunto.lat}" placeholder="Es. 45.3561" inputmode="decimal"></div>
+<div><div class="lbl">Longitudine</div><input id="fpLng" class="inp" value="${S.fPunto.lng}" placeholder="Es. 9.1172" inputmode="decimal"></div>
+</div>`}
+<div style="display:flex;gap:8px;margin-top:10px">
+<button id="btnSvPunto" class="btn btn-p" style="flex:1">✓ Aggiungi punto</button>
+<button id="btnCxPunto" class="btn btn-g">Annulla</button>
+</div></div>`:'';
+    content=`<div id="colonia-map"></div>
+${isP?`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+<div style="font-size:12px;color:var(--muted)">💡 Tocca la mappa per aggiungere un punto veloce</div>
+${!S.addPunto?`<button class="btn btn-p btn-sm" id="btnNwPunto">📍 Aggiungi</button>`:''}
+</div>`:''}
+${formPunto}
+${puntiCol.length===0?'<div class="empty" style="padding:1rem">Nessun punto inserito per questa colonia</div>':
+puntiCol.map(p=>`<div class="map-punto">
+<div class="map-punto-icon">📍</div>
+<div class="map-punto-info">
+<div class="map-punto-label">${p.label}</div>
+${p.indirizzo?`<div class="map-punto-addr">${p.indirizzo}</div>`:''}
+<div style="font-size:10px;color:#bbb;margin-top:1px">${typeof p.lat==='number'?p.lat.toFixed(5):p.lat}, ${typeof p.lng==='number'?p.lng.toFixed(5):p.lng}</div>
+</div>
+${isP?`<button class="btn btn-r btn-sm" data-rmpunto="${p.id}">🗑</button>`:''}
+</div>`).join('')}`;
   }
   return `${colSel}<div class="card" style="border-left:4px solid var(--forest)">
 <div style="font-size:16px;font-weight:700;color:var(--forest)">${col.emoji} Colonia ${col.nome}</div>
@@ -1286,8 +1427,10 @@ const bindPage=()=>{
   document.querySelectorAll('[data-resetpin]').forEach(b=>b.addEventListener('click',e=>doResetPin(e.currentTarget.dataset.resetpin)));
   document.querySelectorAll('[data-remvol]').forEach(b=>b.addEventListener('click',e=>{if(confirm('Eliminare?'))doRemVol(e.currentTarget.dataset.remvol);}));
   // colonie / gatti
-  document.querySelectorAll('[data-selcol]').forEach(b=>b.addEventListener('click',e=>{S.selColonia=e.currentTarget.dataset.selcol;S.addCat=false;render();}));
-  document.querySelectorAll('[data-coltab]').forEach(b=>b.addEventListener('click',e=>{S.coloniaTab=e.currentTarget.dataset.coltab;render();}));
+  document.querySelectorAll('[data-selcol]').forEach(b=>b.addEventListener('click',e=>{S.selColonia=e.currentTarget.dataset.selcol;S.addCat=false;S.addPunto=false;S.coloniaTab='gatti';render();}));
+  document.querySelectorAll('[data-coltab]').forEach(b=>b.addEventListener('click',e=>{
+    S.coloniaTab=e.currentTarget.dataset.coltab;render();
+    if(S.coloniaTab==='mappa')setTimeout(()=>initMap(),120);}));
   document.getElementById('btnNwCat')?.addEventListener('click',()=>{S.fcat.coloniaId=S.selColonia;S.addCat=true;render();});
   document.getElementById('btnCxCat')?.addEventListener('click',()=>{S.addCat=false;render();});
   document.getElementById('fcNome')?.addEventListener('input',e=>S.fcat.nome=e.target.value);
@@ -1297,6 +1440,19 @@ const bindPage=()=>{
   document.getElementById('fcSter')?.addEventListener('change',e=>S.fcat.sterilizzato=e.target.checked);
   document.getElementById('fcNote')?.addEventListener('input',e=>S.fcat.note=e.target.value);
   document.getElementById('btnSvCat')?.addEventListener('click',doAddGatto);
+  // mappa
+  document.getElementById('btnNwPunto')?.addEventListener('click',()=>{S.addPunto=true;render();setTimeout(()=>initMap(),120);});
+  document.getElementById('btnCxPunto')?.addEventListener('click',()=>{S.addPunto=false;render();setTimeout(()=>initMap(),120);});
+  document.getElementById('fpLabel')?.addEventListener('input',e=>S.fPunto.label=e.target.value);
+  document.getElementById('fpAddr')?.addEventListener('input',e=>S.fPunto.indirizzo=e.target.value);
+  document.getElementById('fpLat')?.addEventListener('input',e=>S.fPunto.lat=e.target.value);
+  document.getElementById('fpLng')?.addEventListener('input',e=>S.fPunto.lng=e.target.value);
+  document.getElementById('modeAddr')?.addEventListener('click',()=>{S.fPunto.mode='addr';render();setTimeout(()=>initMap(),120);});
+  document.getElementById('modeCoords')?.addEventListener('click',()=>{S.fPunto.mode='coords';render();setTimeout(()=>initMap(),120);});
+  document.getElementById('btnSvPunto')?.addEventListener('click',doAddPunto);
+  document.querySelectorAll('[data-rmpunto]').forEach(b=>b.addEventListener('click',e=>doRemPunto(e.currentTarget.dataset.rmpunto)));
+  // reinizializza mappa se tab mappa già attiva dopo render
+  if(S.coloniaTab==='mappa')setTimeout(()=>initMap(),120);
   document.querySelectorAll('[data-catdetail]').forEach(b=>b.addEventListener('click',e=>{
     const g=S.gatti.find(x=>x.id===e.currentTarget.dataset.catdetail);
     if(!g)return;
@@ -1355,6 +1511,7 @@ ${isP?`<button class="btn btn-r" style="margin-top:8px" onclick="if(confirm('Eli
 
 // esponi doRemGatto globalmente per il sheet
 window.doRemGatto=doRemGatto;
+window.doRemPunto=doRemPunto;
 
 // ── PWA ───────────────────────────────────────────────────────────────────────
 window._canInstall=false;
