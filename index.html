@@ -148,7 +148,16 @@ button,input,select,textarea{font-family:inherit}
 .alert-item{font-size:12px;padding:5px 0;border-bottom:1px solid rgba(0,0,0,.07);display:flex;justify-content:space-between;align-items:center;gap:6px}
 .alert-item:last-child{border-bottom:none}
 /* MAPPA */
-#colonia-map{height:260px;border-radius:12px;border:1.5px solid var(--border);margin-bottom:10px;z-index:1}
+#colonia-map{height:480px;border-radius:12px;border:1.5px solid var(--border);margin-bottom:10px;z-index:1}
+.map-overlay-btn{position:absolute;top:10px;right:10px;z-index:1000;
+  background:var(--forest);color:#fff;border:none;border-radius:8px;
+  padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;
+  box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.map-overlay-btn:hover{background:var(--forest2)}
+.map-overlay-hint{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);
+  z-index:1000;background:rgba(0,0,0,.65);color:#fff;border-radius:999px;
+  padding:6px 14px;font-size:12px;font-weight:500;pointer-events:none;white-space:nowrap}
+.map-wrap{position:relative;margin-bottom:10px}
 .map-punto{background:#fff;border:2px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:6px;display:flex;align-items:center;gap:8px}
 .map-punto-icon{font-size:18px;flex-shrink:0}
 .map-punto-info{flex:1;min-width:0}
@@ -497,13 +506,32 @@ const doAddPunto=async()=>{
   setTimeout(()=>initMap(),100);};
 
 const doAddPuntoFromMap=async(lat,lng)=>{
-  const label=prompt('Nome del punto (es. "Zona mangiatoie nord"):');
-  if(!label)return;
-  const p={coloniaId:S.selColonia,label:label.trim(),indirizzo:'',lat,lng,
-    createdById:S.user.id,createdAt:serverTimestamp()};
-  const ref=await addDoc(collection(db,'punti_colonia'),p);
-  S.punti.push({id:ref.id,...p});
-  toast('Punto aggiunto');render();setTimeout(()=>initMap(),100);};
+  // mostra mini-sheet per inserire il nome
+  const sheetHtml=`
+    <div style="font-size:15px;font-weight:700;color:var(--forest);margin-bottom:12px">📍 Nuovo punto sulla mappa</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px">🌐 ${lat}, ${lng}</div>
+    <div class="lbl">Nome / descrizione</div>
+    <input id="quickPuntoLabel" class="inp" placeholder='Es. Zona mangiatoie nord' style="margin-bottom:12px">
+    <div style="display:flex;gap:8px">
+      <button id="btnSvQuickPunto" class="btn btn-p" style="flex:1">✓ Aggiungi</button>
+      <button onclick="closeSheet();setMapAddMode(true)" class="btn btn-g">Annulla</button>
+    </div>`;
+  openSheet(sheetHtml,()=>{
+    const inp=document.getElementById('quickPuntoLabel');
+    if(inp)inp.focus();
+    document.getElementById('btnSvQuickPunto')?.addEventListener('click',async()=>{
+      const label=document.getElementById('quickPuntoLabel')?.value?.trim();
+      if(!label){toast('Inserisci un nome','err');return;}
+      const p={coloniaId:S.selColonia,label,indirizzo:'',lat,lng,
+        createdById:S.user.id,createdAt:serverTimestamp()};
+      const ref=await addDoc(collection(db,'punti_colonia'),p);
+      S.punti.push({id:ref.id,...p});
+      closeSheet();setMapAddMode(false);
+      toast('Punto aggiunto');render();setTimeout(()=>initMap(),120);
+    });
+  });
+  setMapAddMode(false); // disattiva crosshair mentre compili il nome
+};
 
 const doRemPunto=async id=>{
   await deleteDoc(doc(db,'punti_colonia',id));
@@ -571,44 +599,84 @@ const doAddColonia=async()=>{
 
 // ── MAPPA LEAFLET ────────────────────────────────────────────────────────────
 let _map=null;
+let _mapAddMode=false; // true = click su mappa aggiunge punto
+
+const setMapAddMode=(on)=>{
+  _mapAddMode=on;
+  const hint=document.getElementById('mapHint');
+  const btn=document.getElementById('mapAddModeBtn');
+  if(hint)hint.style.display=on?'block':'none';
+  if(btn){btn.textContent=on?'✕ Annulla':'📍 Aggiungi punto';
+    btn.style.background=on?'#C62828':'var(--forest)';}
+  if(_map)_map.getContainer().style.cursor=on?'crosshair':'grab';
+};
+
 const initMap=()=>{
   const el=document.getElementById('colonia-map');
   if(!el)return;
   const puntiCol=S.punti.filter(p=>p.coloniaId===S.selColonia);
   const isP=can(S.user,'coordinatore');
-  // distruggi mappa precedente se esiste
-  if(_map){_map.remove();_map=null;}
-  // centro default Basiglio
-  let center=[45.356,9.117],zoom=15;
-  if(puntiCol.length){
-    center=[puntiCol[0].lat,puntiCol[0].lng];
-    zoom=puntiCol.length>1?14:16;
-  }
-  _map=L.map('colonia-map',{zoomControl:true}).setView(center,zoom);
+  // distruggi mappa precedente
+  if(_map){_map.remove();_map=null;}_mapAddMode=false;
+  // centro default Basiglio Milano 3
+  let center=[45.356,9.117],zoom=16;
+  _map=L.map('colonia-map',{zoomControl:true,tap:false}).setView(center,zoom);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-    attribution:'© OpenStreetMap',maxZoom:19}).addTo(_map);
-  // marker personalizzato verde
-  const mkIcon=L.divIcon({className:'',html:`<div style="background:var(--forest);border:3px solid #fff;border-radius:50%;width:18px;height:18px;box-shadow:0 2px 6px rgba(0,0,0,.35)"></div>`,iconSize:[18,18],iconAnchor:[9,9]});
-  puntiCol.forEach(p=>{
-    const mk=L.marker([p.lat,p.lng],{icon:mkIcon}).addTo(_map);
-    const popupHtml=`<div style="font-size:13px;font-weight:700;color:#2D5016;margin-bottom:4px">${p.label}</div>
-      ${p.indirizzo?`<div style="font-size:12px;color:#666;margin-bottom:6px">${p.indirizzo}</div>`:''}
-      <div style="font-size:11px;color:#999">${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</div>
-      ${isP?`<button onclick="doRemPunto('${p.id}')" style="margin-top:8px;background:#D32F2F;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer">🗑 Rimuovi</button>`:''}`;
-    mk.bindPopup(popupHtml,{maxWidth:220});
+    attribution:'© <a href="https://openstreetmap.org">OpenStreetMap</a>',
+    maxZoom:19}).addTo(_map);
+  // icona marker verde a goccia
+  const mkIcon=(label)=>L.divIcon({
+    className:'',
+    html:`<div style="position:relative;display:flex;flex-direction:column;align-items:center">
+      <div style="background:var(--forest);border:3px solid #fff;border-radius:50% 50% 50% 0;
+        width:26px;height:26px;transform:rotate(-45deg);
+        box-shadow:0 3px 8px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center">
+        <div style="transform:rotate(45deg);color:#fff;font-size:12px">📍</div>
+      </div>
+      <div style="background:rgba(45,80,22,.85);color:#fff;font-size:10px;font-weight:700;
+        border-radius:4px;padding:2px 5px;margin-top:3px;white-space:nowrap;
+        max-width:100px;overflow:hidden;text-overflow:ellipsis;box-shadow:0 1px 4px rgba(0,0,0,.3)">
+        ${label}
+      </div>
+    </div>`,
+    iconSize:[26,52],iconAnchor:[13,52],popupAnchor:[0,-54]
   });
-  // click su mappa per aggiungere punto (solo admin)
+  // aggiungi marker con popup — stopPropagation evita che il click apra anche il listener mappa
+  puntiCol.forEach(p=>{
+    const lat=typeof p.lat==='number'?p.lat:parseFloat(p.lat);
+    const lng=typeof p.lng==='number'?p.lng:parseFloat(p.lng);
+    if(isNaN(lat)||isNaN(lng))return;
+    const mk=L.marker([lat,lng],{icon:mkIcon(p.label)}).addTo(_map);
+    const coords=`${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    const popupHtml=`
+      <div style="font-family:-apple-system,sans-serif;min-width:160px">
+        <div style="font-size:14px;font-weight:700;color:#2D5016;margin-bottom:4px">📍 ${p.label}</div>
+        ${p.indirizzo?`<div style="font-size:12px;color:#555;margin-bottom:5px">🏠 ${p.indirizzo}</div>`:''}
+        <div style="font-size:11px;color:#999;margin-bottom:${isP?8:0}px">🌐 ${coords}</div>
+        ${isP?`<button onclick="event.stopPropagation();doRemPunto('${p.id}')"
+          style="background:#D32F2F;color:#fff;border:none;border-radius:6px;
+          padding:5px 12px;font-size:12px;cursor:pointer;width:100%">🗑 Rimuovi punto</button>`:''}
+      </div>`;
+    mk.bindPopup(popupHtml,{maxWidth:240,closeButton:true});
+    // stopPropagation: click sul marker NON attiva il listener della mappa
+    mk.on('click',e=>{L.DomEvent.stopPropagation(e);mk.openPopup();});
+  });
+  // fit bounds se ci sono punti
+  if(puntiCol.length===1){
+    _map.setView([typeof puntiCol[0].lat==='number'?puntiCol[0].lat:parseFloat(puntiCol[0].lat),
+                  typeof puntiCol[0].lng==='number'?puntiCol[0].lng:parseFloat(puntiCol[0].lng)],17);
+  }else if(puntiCol.length>1){
+    const valid=puntiCol.filter(p=>!isNaN(parseFloat(p.lat)));
+    if(valid.length)_map.fitBounds(valid.map(p=>[parseFloat(p.lat),parseFloat(p.lng)]),{padding:[30,30]});
+  }
+  // click mappa aggiunge punto SOLO se _mapAddMode è attivo
   if(isP){
     _map.on('click',e=>{
-      const{lat,lng}=e.latlng;
-      doAddPuntoFromMap(lat.toFixed(6),lng.toFixed(6));
+      if(!_mapAddMode)return;
+      const lat=parseFloat(e.latlng.lat.toFixed(6));
+      const lng=parseFloat(e.latlng.lng.toFixed(6));
+      doAddPuntoFromMap(lat,lng);
     });
-    // cursore pointer per indicare che è cliccabile
-    el.style.cursor='crosshair';
-  }
-  // fit bounds se più punti
-  if(puntiCol.length>1){
-    _map.fitBounds(puntiCol.map(p=>[p.lat,p.lng]),{padding:[20,20]});
   }
 };
 
@@ -1106,11 +1174,11 @@ ${S.fPunto.mode==='addr'
 <button id="btnSvPunto" class="btn btn-p" style="flex:1">✓ Aggiungi punto</button>
 <button id="btnCxPunto" class="btn btn-g">Annulla</button>
 </div></div>`:'';
-    content=`<div id="colonia-map"></div>
-${isP?`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-<div style="font-size:12px;color:var(--muted)">💡 Tocca la mappa per aggiungere un punto veloce</div>
-${!S.addPunto?`<button class="btn btn-p btn-sm" id="btnNwPunto">📍 Aggiungi</button>`:''}
-</div>`:''}
+    content=`<div class="map-wrap">
+  <div id="colonia-map"></div>
+  ${isP?`<button class="map-overlay-btn" id="mapAddModeBtn">📍 Aggiungi punto</button>
+  <div class="map-overlay-hint" id="mapHint" style="display:none">Tocca la mappa per posizionare il punto</div>`:''}
+</div>
 ${formPunto}
 ${puntiCol.length===0?'<div class="empty" style="padding:1rem">Nessun punto inserito per questa colonia</div>':
 puntiCol.map(p=>`<div class="map-punto">
@@ -1441,6 +1509,8 @@ const bindPage=()=>{
   document.getElementById('fcNote')?.addEventListener('input',e=>S.fcat.note=e.target.value);
   document.getElementById('btnSvCat')?.addEventListener('click',doAddGatto);
   // mappa
+  document.getElementById('mapAddModeBtn')?.addEventListener('click',()=>{
+    setMapAddMode(!_mapAddMode);});
   document.getElementById('btnNwPunto')?.addEventListener('click',()=>{S.addPunto=true;render();setTimeout(()=>initMap(),120);});
   document.getElementById('btnCxPunto')?.addEventListener('click',()=>{S.addPunto=false;render();setTimeout(()=>initMap(),120);});
   document.getElementById('fpLabel')?.addEventListener('input',e=>S.fPunto.label=e.target.value);
@@ -1512,6 +1582,8 @@ ${isP?`<button class="btn btn-r" style="margin-top:8px" onclick="if(confirm('Eli
 // esponi doRemGatto globalmente per il sheet
 window.doRemGatto=doRemGatto;
 window.doRemPunto=doRemPunto;
+window.setMapAddMode=setMapAddMode;
+window.closeSheet=closeSheet;
 
 // ── PWA ───────────────────────────────────────────────────────────────────────
 window._canInstall=false;
